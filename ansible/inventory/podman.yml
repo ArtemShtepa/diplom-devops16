@@ -1,0 +1,5 @@
+---
+plugin: constructed
+groups:
+  podman: (group_names | intersect(['gitlab', 'runner', 'grafana', 'influxdb', 'telegraf'])) | length > 0
+...

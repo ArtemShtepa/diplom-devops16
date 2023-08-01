@@ -1,0 +1,9 @@
+---
+grafana_version: "10.0.1"
+grafana_port: "3000"
+grafana_home: "/home/{{ ansible_user }}/grafana"
+grafana_admin_user: "root"
+grafana_admin_password: "grafana_(root)"
+grafana_view_user: "viewer"
+grafana_view_password: "viewer_password"
+...

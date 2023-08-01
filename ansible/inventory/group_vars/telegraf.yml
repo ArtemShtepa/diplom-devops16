@@ -1,0 +1,4 @@
+---
+telegraf_version: "1.27.1"
+telegraf_home: "/home/{{ ansible_user }}/telegraf"
+...

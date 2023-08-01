@@ -1,0 +1,90 @@
+---
+- name: Check cluster presence
+  hosts: kube_nodes
+  tasks:
+    - name: Get kubectl status
+      ansible.builtin.command: "kubectl version -o json"
+      register: ctl_res
+      changed_when: false
+      ignore_errors: true
+    - name: Exit if there is no cluster
+      meta: end_host
+      when: ctl_res.rc == 1
+    - name: Reset cluster node by kubeadm
+      become: true
+      ansible.builtin.command: "kubeadm reset -f"
+    - name: Remove CNI configuration
+      become: true
+      ansible.builtin.file:
+        path: "/etc/cni/net.d"
+        state: absent
+    - name: Remove kubeconfig
+      ansible.builtin.file:
+        path: "~/.kube/config"
+        state: absent
+
+- name: Create main control plane
+  hosts: kube_master[0]
+
+  tasks:
+    - name: Initialize main control plane
+      ansible.builtin.command: "kubeadm init --pod-network-cidr {{ kube_network_cidr }} --control-plane-endpoint {{ hostvars[groups.kube_proxy.0].ansible_host }}:{{ kube_api_proxy_port }} --upload-certs"
+    - name: Get admin config file
+      ansible.builtin.fetch:
+        src: "/etc/kubernetes/admin.conf"
+        dest: "files/_kube_admin.conf"
+        flat: true
+    - name: Get the token for joining the nodes with Kuberentes master.
+      ansible.builtin.shell: "kubeadm token create --print-join-command"
+      register: kube_join
+    - name: Copy join command to local file
+      ansible.builtin.copy:
+        content: "{{ kube_join.stdout_lines[0] }}"
+        dest: "files/_kube_join_command"
+        mode: 0777
+      delegate_to: localhost
+
+- name: Join additional control planes
+  hosts: kube_master[1:]
+  tasks:
+    - name: Initialize join
+      become: true
+      ansible.builtin.command: "kubeadm"
+
+- name: Create kube config at kube proxy
+  hosts: kube_proxy
+  tasks:
+    - name: Create directory for kube config
+      ansible.builtin.file:
+        path: "/home/{{ ansible_user }}/.kube"
+        state: directory
+        #owner: "{{ ansible_user }}"
+        #group: "{{ ansible_user }}"
+        mode: 0755
+    - name: Copy admin config to user`s home
+      ansible.builtin.copy:
+        src: "files/_kube_admin.conf"
+        dest: "/home/{{ ansible_user }}/.kube/config"
+        #owner: "{{ ansible_user }}"
+        #group: "{{ ansible_user }}"
+        mode: 0644
+    - name: Remove the cache directory.
+      ansible.builtin.file:
+        path: "/home/{{ ansible_user }}/.kube/cache"
+        state: absent
+
+    - name: Test cluster connection
+      ansible.builtin.command: "kubectl get nodes"
+      register: ctl_res
+    - debug:
+        var: ctl_res
+    - meta: end_host
+
+    - name: Execute additional manifests
+      ansible.builtin.command: "kubectl apply -f {{ item }}"
+      loop: "{{ kube_manifests }}"
+      retries: 3
+      delay: 10
+      register: ctl_res
+      until: ctl_res.rc == 0
+      when: ctl_res.rc == 0

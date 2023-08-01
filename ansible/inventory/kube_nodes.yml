@@ -1,0 +1,5 @@
+---
+plugin: constructed
+groups:
+  kube_nodes: (group_names | intersect(['kube_master', 'kube_worker'])) | length > 0
+...

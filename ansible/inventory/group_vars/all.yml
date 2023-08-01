@@ -1,0 +1,7 @@
+---
+bastion_host: "192.168.1.10"
+bastion_port: 22
+bastion_user: "debian"
+bastion_key: "~/.ssh/my_bastion"
+machine_key: "~/.ssh/my_machine"
+...

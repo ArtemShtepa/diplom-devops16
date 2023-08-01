@@ -1,0 +1,29 @@
+---
+- name: Install sudo package with root
+  hosts: bastion
+  become: true
+  tasks:
+    - name: Update cache for APT
+      ansible.builtin.apt:
+        update_cache: true
+      when: ansible_pkg_mgr == "apt"
+    - name: Install packages
+      ansible.builtin.package:
+        name: "{{ item }}"
+        state: present
+      loop:
+      - haproxy
+      - curl
+      - htop
+    - name: Generate HAProxy configuration file
+      ansible.builtin.template:
+        src: "haproxy_bastion.cfg.jinja2"
+        dest: "/etc/haproxy/haproxy.cfg"
+      notify:
+      - Restart HAProxy
+  handlers:
+    - name: Restart HAProxy
+      ansible.builtin.service:
+        name: "haproxy"
+        state: restarted
+...

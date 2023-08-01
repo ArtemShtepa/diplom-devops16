@@ -1,0 +1,42 @@
+- name: Configure Terraform for Yandex CLI
+  hosts: localhost
+  vars:
+    terraform_version: "1.5.4"
+    terraform_path: "~/.local/bin"
+  tasks:
+    - name: Create terraform provider link to Yandex Mirror
+      ansible.builtin.copy:
+        dest: "~/.terraformrc"
+        content: >
+          provider_installation {
+            network_mirror {
+              url = "https://terraform-mirror.yandexcloud.net/"
+              include = ["registry.terraform.io/*/*"]
+            }
+            direct {
+              exclude = ["registry.terraform.io/*/*"]
+            }
+          }
+    - name: Get latest YC CLI version
+      ansible.builtin.set_fact:
+        yc_ver: "{{ lookup('ansible.builtin.url', 'https://storage.yandexcloud.net/yandexcloud-yc/release/stable') }}"
+    - name: Check YC CLI installation
+      ansible.builtin.shell: "yc --version | grep {{ yc_ver }}"
+      changed_when: false
+      ignore_errors: true
+      register: yc_res
+    - name: Install YC CLI
+      ansible.builtin.shell: "curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash"
+      changed_when: false
+      when: yc_res.rc != 0 or yc_res.stdout_lines|length == 0
+    - name: Check Terraform installation
+      ansible.builtin.shell: "terraform --version | grep {{ terraform_version }}"
+      changed_when: false
+      ignore_errors: true
+      register: tf_res
+    - name: Download Terraform from Yandex Mirror
+      ansible.builtin.unarchive:
+        src: "https://hashicorp-releases.yandexcloud.net/terraform/{{ terraform_version }}/terraform_{{ terraform_version }}_linux_amd64.zip"
+        dest: "{{ terraform_path }}"
+        remote_src: yes
+      when: tf_res.rc != 0 or tf_res.stdout_lines|length == 0

@@ -1,0 +1,19 @@
+---
+kube_version: "1.27.4"
+kube_api_port: "6443"
+kube_api_proxy_port: "6443"
+kube_network_cidr: "192.168.100.0/24"
+kube_manifests:
+  - "https://docs.projectcalico.org/manifests/calico.yaml"
+  #- "https://raw.githubusercontent.com/projectcalico/calico/v3.26.1/manifests/calico.yaml"
+  # - "https://raw.githubusercontent.com/projectcalico/calico/v3.26.1/manifests/custom-resources.yaml"
+qbec_version: "0.15.2"
+containerd_version: "1.7.2"
+containerd_link: "https://github.com/containerd/containerd/releases/download/v{{ containerd_version }}/containerd-{{ containerd_version }}-linux-amd64.tar.gz"
+containerd_service_link: "https://raw.githubusercontent.com/containerd/containerd/main/containerd.service"
+containerd_sandbox_image: "registry.k8s.io/pause:3.9"
+runc_version: "1.1.7"
+runc_link: "https://github.com/opencontainers/runc/releases/download/v{{ runc_version }}/runc.amd64"
+cni_plugins_version: "1.3.0"
+cni_plugins_link: "https://github.com/containernetworking/plugins/releases/download/v{{ cni_plugins_version }}/cni-plugins-linux-amd64-v{{ cni_plugins_version }}.tgz"
+...

@@ -1,0 +1,46 @@
+---
+- name: Install prerequirements
+  hosts: telegraf
+  tasks:
+    - name: Create Telegraf directories
+      ansible.builtin.file:
+        path: "{{ telegraf_home }}"
+        state: directory
+    - name: Copy Telegraf configuration file
+      ansible.builtin.copy:
+        src: "_telegraf.conf"
+        dest: "{{ telegraf_home }}/telegraf.conf"
+      register: cnf_res
+    - name: Run Telegraf container
+      containers.podman.podman_container:
+        name: telegraf
+        image: "docker.io/telegraf:{{ telegraf_version }}"
+        state: started
+        user: "telegraf"
+        restart_policy: "always"
+        recreate: "{{ cnf_res.changed }}"
+        generate_systemd:
+          container_prefix: "podman"
+          path: "~/.config/systemd/user/"
+          restart_policy: "always"
+        hostname: "{{ inventory_hostname }}"
+        env:
+            HOST_ETC: /hostfs/etc
+            HOST_PROC: /hostfs/proc
+            HOST_SYS: /hostfs/sys
+            HOST_VAR: /hostfs/var
+            HOST_RUN: /hostfs/run
+            HOST_MOUNT_PREFIX: /hostfs
+        volumes:
+            - "{{ telegraf_home }}/telegraf.conf:/etc/telegraf/telegraf.conf:ro"
+            #- /sys:/hostfs/sys:ro
+            #- /proc:/hostfs/proc:ro
+            #- /etc:/hostfs/etc:ro
+            - "/:/hostfs:ro"
+        #network: host
+    - name: Run as service
+      ansible.builtin.systemd:
+        name: podman-telegraf
+        scope: user
+        enabled: true
+...

@@ -1,0 +1,43 @@
+global
+    log /dev/log local0
+    log /dev/log local1 notice
+    daemon
+
+defaults
+    mode                    http
+    log                     global
+    option                  httplog
+    option                  dontlognull
+    option http-server-close
+    option forwardfor       except 127.0.0.0/8
+    option                  redispatch
+    retries                 1
+    timeout http-request    10s
+    timeout queue           20s
+    timeout connect         5s
+    timeout client          20s
+    timeout server          20s
+    timeout http-keep-alive 10s
+    timeout check           10s
+
+frontend apiserver
+    bind *:{{ hostvars[groups.kube_nodes.0].kube_api_proxy_port }}
+    mode tcp
+    option tcplog
+    default_backend apiserver
+
+listen stats
+  bind *:80
+  stats enable
+  stats uri /kubeapi_stats
+  stats auth root:haproxy
+
+backend apiserver
+    option httpchk GET /healthz
+    http-check expect status 200
+    mode tcp
+    option ssl-hello-chk
+    balance     roundrobin
+{% for item in groups['kube_master'] %}
+        server {{ item }} {{ hostvars[item].ansible_host }}:{{ hostvars[groups.kube_nodes.0].kube_api_port }} check
+{% endfor %}

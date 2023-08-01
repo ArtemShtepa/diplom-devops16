@@ -1,0 +1,14 @@
+apiVersion: 1
+
+datasources:
+  - name: "InfluxDB v2 Flux"
+    type: influxdb
+    access: proxy
+    url: "http://{{ hostvars[groups.influxdb | random].ansible_host }}:{{ influxdb_port }}"
+    jsonData:
+      version: Flux
+      organization: "{{ influxdb_org }}"
+      defaultBucket: "{{ influxdb_bucket }}"
+      tlsSkipVerify: true
+    secureJsonData:
+      token: "{{ influxdb_token_read }}"

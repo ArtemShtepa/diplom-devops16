@@ -1,0 +1,74 @@
+---
+- name: Install prerequirements
+  hosts: grafana
+  tasks:
+    - name: Create Grafana directories
+      ansible.builtin.file:
+        path: "{{ grafana_home }}/{{ item }}"
+        state: directory
+      loop:
+        - ""
+        - "data"
+        - "config"
+        - "dashboards"
+    - name: Generate Grafana configuration file
+      ansible.builtin.template:
+        src: "grafana.ini.jinja2"
+        dest: "{{ grafana_home }}/grafana.ini"
+    - name: Copy Provision files
+      ansible.builtin.copy:
+        src: "{{ item.src }}"
+        dest: "{{ grafana_home }}/{{ item.dest }}"
+      loop:
+        - { src: "_grafana-ds-influxdb.yml", dest: "config/ds-influxdb.yml" }
+        - { src: "grafana-db-hosts.yml", dest: "config/db-hosts.yml" }
+        - { src: "grafana-db-hosts.json", dest: "dashboards/hosts.json" }
+        - { src: "grafana-db-home.json", dest: "config/home.json" }
+    - name: Run Grafana container
+      containers.podman.podman_container:
+        name: grafana
+        image: "docker.io/grafana/grafana-oss:{{ grafana_version }}"
+        state: started
+        user: "0:0"
+        restart_policy: "always"
+        generate_systemd:
+          container_prefix: "podman"
+          path: "~/.config/systemd/user/"
+          restart_policy: "always"
+        publish:
+          - "{{ grafana_port }}:3000"
+        volume:
+          - "{{ grafana_home }}/data:/var/lib/grafana"
+          - "{{ grafana_home }}/dashboards:/var/lib/grafana/dashboards"
+          - "{{ grafana_home }}/config/ds-influxdb.yml:/etc/grafana/provisioning/datasources/influxdb.yml"
+          - "{{ grafana_home }}/config/db-hosts.yml:/etc/grafana/provisioning/dashboards/hosts.yml"
+          - "{{ grafana_home }}/grafana.ini:/etc/grafana/grafana.ini:Z"
+          - "{{ grafana_home }}/config/home.json:/var/lib/grafana/home.json"
+        #network: host
+      register: cnt_res
+    - name: Wait for Grafana is ready
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ grafana_port }}"
+        status_code: 200
+      register: cmd_res
+      until: cmd_res.status == 200
+      retries: 90
+      delay: 1
+      when: cnt_res.container.State.Status == "running"
+    - name: Create Viewer user
+      community.grafana.grafana_user:
+        url: "http://127.0.0.1:{{ grafana_port }}"
+        url_username: "{{ grafana_admin_user }}"
+        url_password: "{{ grafana_admin_password }}"
+        name: "{{ grafana_view_user }}"
+        login: "{{ grafana_view_user }}"
+        password: "{{ grafana_view_password }}"
+        email: "local@local"
+        state: present
+      no_log: true
+    - name: Run as service
+      ansible.builtin.systemd:
+        name: podman-grafana
+        scope: user
+        enabled: true
+...

@@ -1,0 +1,53 @@
+- name: Install necessary packages
+  become: true
+  ansible.builtin.package:
+    name:
+      - curl
+      - apt-transport-https
+      - software-properties-common
+      - ca-certificates
+      - gnupg
+      - gnupg2
+    state: present
+
+- block:
+  - name: Check APT key exists
+    ansible.builtin.stat:
+      path: "/etc/apt/trusted.gpg.d/cgoogle.gpg"
+    register: key_res
+  - block:
+    - name: Download keyring file
+      ansible.builtin.get_url:
+        url: "https://packages.cloud.google.com/apt/doc/apt-key.gpg"
+        dest: "/tmp/cgoogle.gpg"
+    - name: Create APT key
+      ansible.builtin.command: "gpg --dearmour -o /etc/apt/trusted.gpg.d/cgoogle.gpg /tmp/cgoogle.gpg"
+    when: key_res.stat.exists == False
+  - name: Create kubernetes repo
+    ansible.builtin.copy:
+      dest: "/etc/apt/sources.list.d/kubernetes.list"
+      content: "deb https://apt.kubernetes.io/ kubernetes-xenial main"
+      mode: 0600
+    register: rep_res
+  - name: Update APT cache
+    ansible.builtin.apt:
+      update_cache: true
+    when: rep_res.changed == True
+  become: true
+  when: ansible_pkg_mgr == 'apt'
+
+- name: Install kubernetes tools
+  become: true
+  ansible.builtin.package:
+    name:
+      - "kubelet={{ kube_version }}-00"
+      - "kubeadm={{ kube_version }}-00"
+      - "kubectl={{ kube_version }}-00"
+    state: present
+- name: Reboot machine
+  become: true
+  ansible.builtin.reboot:
+    post_reboot_delay: 10
+    reboot_timeout: 40
+    connect_timeout: 60
+    test_command: uptime

@@ -1,0 +1,26 @@
+---
+- name: Install sudo package with root
+  hosts: all
+  vars:
+    ansible_ssh_common_args: ""
+  tasks:
+    - name: Save user name
+      set_fact:
+        remote_user: "{{ ansible_user }}"
+    - name: Change SSH user
+      set_fact:
+        ansible_user: root
+    - name: Install sudo to allow become
+      ansible.builtin.package:
+        name: sudo
+        state: present
+    - name: Disable password prompt
+      ansible.builtin.copy:
+        dest: "/etc/sudoers.d/{{ remote_user }}"
+        content: "{{ remote_user }} ALL=(ALL:ALL) NOPASSWD:ALL"
+    - name: Update cache for APT
+      become: true
+      ansible.builtin.apt:
+        update_cache: true
+      when: ansible_pkg_mgr == "apt"
+...

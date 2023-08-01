@@ -1,0 +1,49 @@
+---
+- name: Install prerequirements
+  hosts: runner
+  tasks:
+    - name: Create Gitlab Runner directories
+      ansible.builtin.file:
+        path: "{{ runner_home }}"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+    - name: Check Gitlab Runner configuration file
+      ansible.builtin.stat:
+        path: "{{ runner_home }}/config.toml"
+      register: cfg_res
+    - name: Generate Gitlab Runner configuration file
+      ansible.builtin.shell: >-
+        podman run --rm
+        --volume {{ runner_home }}:/etc/gitlab-runner
+        docker.io/gitlab/gitlab-runner:{{ runner_version }}
+        register --non-interactive
+        --url "http://{{ bastion_host }}:8000"
+        --token "{{ runner_token }}"
+        --executor "docker"
+        --docker-image "{{ runner_image }}"
+        --description "Builder for GoLang applications for linux"
+      when: not cfg_res.stat.exists
+    - name: Run Gitlab Runner container
+      containers.podman.podman_container:
+        name: runner
+        image: "docker.io/gitlab/gitlab-runner:{{ runner_version }}"
+        state: started
+        restart_policy: "always"
+        recreate: yes
+        generate_systemd:
+          container_prefix: "podman"
+          path: "~/.config/systemd/user/"
+          restart_policy: "always"
+        publish:
+          - "{{ runner_port }}:8093"
+        volume:
+          - "{{ runner_home }}:/etc/gitlab-runner"
+          #- "/run/user/{{ ansible_user_uid }}/podman/podman.sock:/var/run/docker.sock"
+          - "/run/podman/podman.sock:/var/run/docker.sock"
+    - name: Run as service
+      ansible.builtin.systemd:
+        name: podman-runner
+        scope: user
+        enabled: true
+...

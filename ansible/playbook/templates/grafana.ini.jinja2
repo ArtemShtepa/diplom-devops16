@@ -1,0 +1,15 @@
+[server]
+protocol = http
+http_port = 3000
+
+[analytics]
+reporting_enabled = false
+
+[security]
+disable_initial_admin_creation = false
+admin_user = "{{ grafana_admin_user }}"
+admin_password = "{{ grafana_admin_password }}"
+
+[dashboards]
+versions_to_keep = 10
+default_home_dashboard_path = "/var/lib/grafana/home.json"

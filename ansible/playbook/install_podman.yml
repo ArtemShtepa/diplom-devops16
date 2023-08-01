@@ -1,0 +1,17 @@
+---
+- name: Install podman package
+  hosts: podman
+  become: true
+  tasks:
+    - name: Install podman and other packages
+      ansible.builtin.package:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - podman
+        - curl
+        - htop
+    - name: Enable Podman executing without login
+      ansible.builtin.command: "loginctl enable-linger {{ ansible_user_uid }}"
+      changed_when: false
+...

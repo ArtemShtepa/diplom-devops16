@@ -1,0 +1,9 @@
+---
+influxdb_version: "2.7.1"
+influxdb_home: "/home/{{ ansible_user }}/influxdb"
+influxdb_user: "root"
+influxdb_password: "influxdb_(root)"
+influxdb_port: 8086
+influxdb_org: "SA-Netology"
+influxdb_bucket: "main"
+...

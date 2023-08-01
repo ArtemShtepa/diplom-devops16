@@ -1,0 +1,110 @@
+---
+- name: Install prerequirements
+  hosts: influxdb
+  tasks:
+    - name: Create InfluxDB directories
+      ansible.builtin.file:
+        path: "{{ influxdb_home }}/{{ item }}"
+        state: directory
+      loop:
+        - ""
+        - "data"
+        - "config"
+    - name: Run InfluxDB container
+      containers.podman.podman_container:
+        name: influxdb
+        image: "docker.io/influxdb:{{ influxdb_version }}"
+        state: started
+        restart_policy: "always"
+        generate_systemd:
+          container_prefix: "podman"
+          path: "~/.config/systemd/user/"
+          restart_policy: "always"
+        publish:
+          - "{{ influxdb_port }}:8086"
+        volume:
+          - "{{ influxdb_home }}/data:/var/lib/influxdb2"
+          - "{{ influxdb_home }}/config:/etc/influxdb2"
+    - name: Configure InfluxDB Instance
+      ansible.builtin.command: >-
+        podman exec influxdb
+        influx setup
+        --username "{{ influxdb_user }}"
+        --password "{{ influxdb_password }}"
+        --org "{{ influxdb_org }}"
+        --bucket "{{ influxdb_bucket }}"
+        --force
+      register: cmd_res
+      failed_when:
+        - 'cmd_res.rc != 0'
+        - '"has already been set up" not in cmd_res.stderr'
+      changed_when: cmd_res.rc == 0
+    - name: Get bucket ID from CLI
+      ansible.builtin.command: >-
+        podman exec influxdb
+        influx bucket list -n "{{ influxdb_bucket }}" -o "{{ influxdb_org }}" --hide-headers --json
+      register: cmd_res
+      changed_when: false
+    - name: Set backet ID to ansible fact
+      ansible.builtin.set_fact:
+        influxdb_bucket_id: "{{ (cmd_res.stdout | from_json)[0].id }}"
+    - name: Get InfluxDB tokens info
+      ansible.builtin.command: "podman exec influxdb influx auth list --json"
+      register: cmd_res
+      changed_when: false
+    - name: Search READ token
+      ansible.builtin.set_fact:
+        influxdb_token_read: "{{ item.token }}"
+      when: item.description == 'READ token'
+      loop: "{{ cmd_res.stdout | from_json }}"
+    - name: Search WRITE token
+      ansible.builtin.set_fact:
+        influxdb_token_write: "{{ item.token }}"
+      when: item.description == 'WRITE token'
+      loop: "{{ cmd_res.stdout | from_json }}"
+    - block:
+        - name: Create READ token
+          ansible.builtin.command: >-
+            podman exec -ti influxdb
+            influx auth create
+            --description 'READ token'
+            --org "{{ influxdb_org }}"
+            --read-bucket "{{ influxdb_bucket_id }}"
+            --json
+          register: cmd_res
+          changed_when: false
+        - name: Get READ token
+          ansible.builtin.set_fact:
+            influxdb_token_read: "{{ (cmd_res.stdout | from_json).token }}"
+      when: (influxdb_token_read is undefined) or (influxdb_token_read == '')
+    - name: Template GRAFANA data source provisioning
+      ansible.builtin.template:
+        src: "grafana-ds-influxdb.yml.jinja2"
+        dest: "files/_grafana-ds-influxdb.yml"
+      delegate_to: localhost
+    - block:
+        - name: Create WRITE token
+          ansible.builtin.command: >-
+            podman exec -ti influxdb
+            influx auth create
+            --description 'WRITE token'
+            --org "{{ influxdb_org }}"
+            --write-bucket "{{ influxdb_bucket_id }}"
+            --json
+          register: cmd_res
+          changed_when: false
+        - name: Get WRITE token
+          ansible.builtin.set_fact:
+            influxdb_token_write: "{{ (cmd_res.stdout | from_json).token }}"
+      when: (influxdb_token_write is undefined) or (influxdb_token_write == '')
+    - name: Template TELEGRAF configuration file
+      ansible.builtin.template:
+        src: telegraf.conf.jinja2
+        dest: files/_telegraf.conf
+      delegate_to: localhost
+    - name: Run as service
+      ansible.builtin.systemd:
+        name: podman-influxdb
+        scope: user
+        enabled: true
+...

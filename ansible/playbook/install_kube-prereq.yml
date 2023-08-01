@@ -1,0 +1,89 @@
+---
+- name: Prepare kube cluster hosts
+  hosts: kube_nodes
+  become: true
+  tasks:
+    - name: Check swap settings
+      ansible.builtin.command: "sudo swapon --bytes --noheadings"
+      register: swap_res
+      changed_when: false
+    - name: Disabling swap
+      block:
+        - name: Disabling swap online
+          ansible.builtin.command: "swapoff -a"
+        - name: Disabling swap on fstab
+          ansible.builtin.shell: sed -ri '/\sswap\s/s/^#?/#/' /etc/fstab
+      when: swap_res.stdout_lines | length > 0
+    - name: Set host name from playbook
+      ansible.builtin.hostname:
+        name: "{{ inventory_hostname }}"
+    - name: Update host names
+      ansible.builtin.blockinfile:
+        path: "/etc/hosts"
+        create: true
+        block: |
+          {% for item in groups['kube_nodes'] %}
+          {{ hostvars[item]['ansible_host'] }} {{ item }}
+          {% endfor %}
+
+- name: Install prerequirements
+  hosts: kube_nodes
+  tasks:
+    - name: Check containerd installed
+      ansible.builtin.file:
+        path: "/var/run/containerd/containerd.sock"
+        state: file
+      register: sock_res
+      ignore_errors: true
+    - name: Install containerd runtime
+      include_tasks: tasks_containerd.yml
+      when: sock_res.failed == true
+    - name: Check kubenetes tools presence
+      ansible.builtin.command: "kubeadm version -o yaml"
+      register: kube_res
+      changed_when: false
+      ignore_errors: true
+    - name: Install kubernetes tools
+      include_tasks: tasks_kube-tools.yml
+      when: kube_res.failed == true
+
+- name: Prepare kubectl proxy machine
+  hosts: kube_proxy
+  become: true
+  vars:
+    kube_version: "{{ hostvars[groups.kube_nodes.0].kube_version }}"
+  tasks:
+    - name: Check kubectl presence
+      become: false
+      ansible.builtin.command: "kubectl version -o json"
+      ignore_errors: true
+      changed_when: false
+      register: ctl_res
+    - name: Download and install kubectl
+      ansible.builtin.get_url:
+        url: "https://dl.k8s.io/release/v{{ kube_version }}/bin/linux/amd64/kubectl"
+        dest: "/usr/local/bin/kubectl"
+        checksum: "sha256:https://dl.k8s.io/v{{ kube_version }}/bin/linux/amd64/kubectl.sha256"
+        mode: 0755
+      when: ctl_res.rc == 2
+    - name: Download and install qbec
+      ansible.builtin.unarchive:
+        src: "https://github.com/splunk/qbec/releases/download/v{{ hostvars[groups.kube_nodes.0].qbec_version }}/qbec-linux-amd64.tar.gz"
+        dest: "/usr/local/bin"
+        remote_src: yes
+    - name: Install HAProxy
+      ansible.builtin.package:
+        name: "haproxy"
+        state: present
+    - name: Generate HAProxy configuration file
+      ansible.builtin.template:
+        src: "haproxy_kubeapi.cfg.jinja2"
+        dest: "/etc/haproxy/haproxy.cfg"
+      notify:
+      - Restart HAProxy
+  handlers:
+    - name: Restart HAProxy
+      ansible.builtin.service:
+        name: "haproxy"
+        state: restarted
+...
