@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+init_dir=$(pwd)
 ansible_dir=$(pwd)/ansible
 terraform_dir=$(pwd)/tf
 
@@ -21,7 +22,7 @@ else
 fi
 
 preinit() {
-  python3 -m pip install --upgrade --user ansible
+  cd $ansible_dir
   ansible-playbook -i inventory playbook/configure_yc+tf.yml
 }
 
