@@ -31,6 +31,11 @@ tf_init() {
   terraform init
 }
 
+tf_plan() {
+  cd $terraform_dir
+  terraform plan
+}
+
 tf_apply() {
   cd $terraform_dir
   terraform apply --auto-approve
@@ -103,6 +108,7 @@ else
   echo "Possible commands:"
   echo "  preinit      - Download and configure YC CLI and Terraform"
   echo "  tf_init      - Terraform init"
+  echo "  tf_plan      - Terraform plan"
   echo "  tf_apply     - Apply Terraform plan"
   echo "  tf_destroy   - Destroy Terraform plan"
   echo "  i_bastion    - Install SSH Bastion"

@@ -1,0 +1,7 @@
+- name: TEST play
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: print vars
+      debug:
+        var: hostvars[inventory_hostname]
