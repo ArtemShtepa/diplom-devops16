@@ -4,3 +4,4 @@
 crash.log
 crash.*.log
 *.tfvars
+.terraform.*

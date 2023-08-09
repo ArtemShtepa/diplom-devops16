@@ -17,14 +17,6 @@
               exclude = ["registry.terraform.io/*/*"]
             }
           }
-    - name: Check Ansible installation
-      ansible.builtin.command: "ansible --version"
-      changed_when: false
-      ignore_errors: true
-      register: a_res
-    - name: Install Ansible
-      ansible.builtin.command: "python3 -m pip install --upgrade --user ansible"
-      when: a_res.failed
     - name: Get latest YC CLI version
       ansible.builtin.set_fact:
         yc_ver: "{{ lookup('ansible.builtin.url', 'https://storage.yandexcloud.net/yandexcloud-yc/release/stable') }}"

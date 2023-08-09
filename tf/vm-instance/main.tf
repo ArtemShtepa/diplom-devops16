@@ -3,19 +3,19 @@ variable name { default = "" }
 # Описание машинки
 variable description { default = "" }
 # Используемая платформа - текстовой идентификатор Яндекс.Облака
-variable platform { default = "standard-v1" }
+variable platform { default = "standard-v2" }
 # Число ядер процессора
-variable cpu { default = "" }
+variable cpu { default = "2" }
 # Объём оперативной памяти, в Гигабайтах
-variable ram { default = "" }
+variable ram { default = "1" }
 # Гарантированная доля загрузки процессора
 variable cpu_load { default = 5 }
 # Прерывемая - может быть остановлена в любой момент
-variable temporary { default = "false" }
+variable temporary { default = "true" }
 # Образ системного диска
 variable main_disk_image { default = "" }
 # Размер системного диска, в Гигабайтах
-variable main_disk_size { default = "" }
+variable main_disk_size { default = "10" }
 # Логин пользователя для которого пробрасывается SSH ключ
 variable user { default = "" }
 # Файл пробрасываемого SSH ключа
@@ -25,7 +25,7 @@ variable subnet { default = "" }
 # Фиксированный внутренний IP адрес
 variable ip { default = "" }
 # Требуется ли подключение машинки к интернету
-variable nat { default = "false" }
+variable internet { default = "false" }
 
 terraform {
   required_providers {
@@ -60,7 +60,7 @@ resource "yandex_compute_instance" "vm-instance" {
   network_interface {
     subnet_id  = var.subnet.id
     ip_address = var.ip
-    nat        = var.nat
+    nat        = var.internet
   }
 
   metadata = {

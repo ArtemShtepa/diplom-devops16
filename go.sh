@@ -21,9 +21,33 @@ else
   #export TF_VAR_YC_ZONE=$(yc config get compute-default-zone)
 fi
 
-preinit() {
+check_bastion() {
+  cd $init_dir
+  export BASTION_IP=$(yc compute instance list --format json | jq -r '.[] | select( .name == "bastion" ) | .network_interfaces[].primary_v4_address.one_to_one_nat.address')
+  if [ -z "$BASTION_IP" ]; then
+    echo "SSH Bastion does not exist or is not configured as NAT"
+    exit 1
+  else
+    echo "Use SSH Bastion at $BASTION_IP";
+  fi
   cd $ansible_dir
-  ansible-playbook -i inventory playbook/configure_yc+tf.yml
+}
+
+preinit() {
+  if ! [ -x "$(command -v ansible)" ]; then
+    python3 -m pip install --upgrade --user ansible
+  fi
+  exit
+  chmod 0600 $init_dir/secrets/*
+  run_playbook false configure_yc+tf.yml
+}
+
+clear() {
+  cd $init_dir
+  rm ansible/playbook/files/_*
+  rm tf/terraform*
+  rm -r tf/.terraform
+  rm tf/.terraform.*
 }
 
 tf_init() {
@@ -46,64 +70,65 @@ tf_destroy() {
   terraform destroy --auto-approve
 }
 
+run_playbook() {
+  if [ "$#" -gt 1 ]; then
+    if [ $1 == "true" ]; then
+      check_bastion
+    else
+      cd $ansible_dir
+    fi
+    for pb in ${@:2}; do
+      ansible-playbook -i inventory playbook/$pb
+    done
+  fi
+}
+
 i_sudo() {
-  cd $ansible_dir
-  ansible-playbook -i inventory playbook/install_sudo.yml
+  run_playbook false install_sudo.yml
 }
 
 i_podman() {
-  cd $ansible_dir
-  ansible-playbook -i inventory playbook/install_podman.yml
+  run_playbook true install_podman.yml
 }
 
 i_gitlab() {
-  cd $ansible_dir
-  ansible-playbook -i inventory playbook/install_gitlab.yml
+  run_playbook true install_gitlab.yml
 }
 
 i_monitoring() {
-  i_influxdb
-  i_grafana
-  i_telegraf
+  run_playbook true install_influcdb.yml install_grafana.yml install_telegraf.yml
 }
 
 i_grafana() {
-  cd $ansible_dir
-  ansible-playbook -i inventory playbook/install_grafana.yml
+  run_playbook true install_grafana.yml
 }
 
 i_influxdb() {
-  cd $ansible_dir
-  ansible-playbook -i inventory playbook/install_influxdb.yml
+  run_playbook true install_influxdb.yml
 }
 
 i_telegraf() {
-  cd $ansible_dir
-  ansible-playbook -i inventory playbook/install_telegraf.yml
+  run_playbook true install_telegraf.yml
 }
 
 i_runner() {
-  cd $ansible_dir
-  ansible-playbook -i inventory playbook/install_runner.yml
+  run_playbook true install_runner.yml
 }
 
 i_bastion() {
-  cd $ansible_dir
-  ansible-playbook -i inventory playbook/install_bastion.yml
+  run_playbook true install_bastion.yml
 }
 
 i_kube_pre() {
-  cd $ansible_dir
-  ansible-playbook -i inventory playbook/install_kube-prereq.yml
+  run_playbook true install_kube-prereq.yml
 }
 
 i_kube_cl() {
-  cd $ansible_dir
-  ansible-playbook -i inventory playbook/install_kube-cluster.yml
+  run_playbook true install_kube-cluster.yml
 }
 
 if [ $1 ]; then
-  $1
+  $*
 else
   echo "Possible commands:"
   echo "  preinit      - Download and configure YC CLI and Terraform"
@@ -122,4 +147,5 @@ else
   echo "  i_runner     - Install GitLab Runner"
   echo "  i_kube_pre   - Install Kubernetes Prerequirements"
   echo "  i_kube_cl    - Install Kubernetes Cluster"
+  echo "  clear        - Clear temporary files"
 fi

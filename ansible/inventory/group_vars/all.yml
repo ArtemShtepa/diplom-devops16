@@ -1,5 +1,5 @@
 ---
-bastion_host: "192.168.1.10"
+bastion_host: "{{ lookup('ansible.builtin.env', 'BASTION_IP') }}"
 bastion_port: 22
 bastion_user: "debian"
 bastion_key: "../secrets/key_bastion"

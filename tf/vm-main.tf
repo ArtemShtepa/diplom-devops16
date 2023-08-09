@@ -7,11 +7,9 @@ module "vm-bastion" {
   user_key    = "../secrets/key_bastion.pub"
   description = "SSH Bastion"
   cpu         = 2
-  ram         = 2
-  cpu_load    = 5
+  ram         = 0.5
   ip          = "192.168.1.10"
-  nat         = true
-  temporary   = true
+  internet    = true
   subnet      = yandex_vpc_subnet.subnet-main
   main_disk_image = yandex_compute_image.os-disk.id
   main_disk_size  = 10
@@ -29,13 +27,11 @@ module "vm-main-1" {
   ram         = 2
   cpu_load    = 5
   ip          = "192.168.1.11"
-  nat         = false
-  temporary   = true
   subnet      = yandex_vpc_subnet.subnet-main
   main_disk_image = yandex_compute_image.os-disk.id
   main_disk_size  = 30
 }
-/*
+
 # Машинка системы мониторинга - InfluxDB и Grafana
 module "vm-main-2" {
   source = "./vm-instance"
@@ -48,9 +44,7 @@ module "vm-main-2" {
   ram         = 2
   cpu_load    = 5
   ip          = "192.168.1.12"
-  nat         = false
-  temporary   = true
-  subnet      = yandex_vpc_subnet.subnet-main.id
+  subnet      = yandex_vpc_subnet.subnet-main
   main_disk_image = yandex_compute_image.os-disk.id
   main_disk_size  = 20
 }
@@ -67,10 +61,7 @@ module "vm-main-3" {
   ram         = 2
   cpu_load    = 5
   ip          = "192.168.1.13"
-  nat         = false
-  temporary   = true
-  subnet      = yandex_vpc_subnet.subnet-main.id
+  subnet      = yandex_vpc_subnet.subnet-main
   main_disk_image = yandex_compute_image.os-disk.id
   main_disk_size  = 30
 }
-*/

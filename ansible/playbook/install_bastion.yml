@@ -1,5 +1,5 @@
 ---
-- name: Install sudo package with root
+- name: Configure routes on Bastion host
   hosts: bastion
   become: true
   tasks:
