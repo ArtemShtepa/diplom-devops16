@@ -25,9 +25,12 @@
       changed_when: false
       ignore_errors: true
       register: yc_res
-    - name: Install YC CLI
-      ansible.builtin.shell: "curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash"
-      changed_when: false
+    - block:
+      - name: Try update YC CLI
+        ansible.builtin.command: "yc components update"
+      rescue:
+      - name: Install YC CLI
+        ansible.builtin.shell: "curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash"
       when: yc_res.rc != 0 or yc_res.stdout_lines|length == 0
     - name: Check Terraform installation
       ansible.builtin.shell: "terraform --version | grep {{ terraform_version }}"

@@ -37,7 +37,6 @@ preinit() {
   if ! [ -x "$(command -v ansible)" ]; then
     python3 -m pip install --upgrade --user ansible
   fi
-  exit
   chmod 0600 $init_dir/secrets/*
   run_playbook false configure_yc+tf.yml
 }
@@ -50,24 +49,37 @@ clear() {
   rm tf/.terraform.*
 }
 
+# Инициализация Terraform
 tf_init() {
   cd $terraform_dir
   terraform init
+  # Создание рабочих пространств
+  terraform workspace new stage
+  terraform workspace new prod
+}
+
+run_terraform() {
+  cd $terraform_dir
+  if [ "$1" == "stage" -o "$1" == "prod" ]; then
+    echo "Use terraform workspace: $1"
+    terraform workspace select -or-create $1
+    tf_cmd=${@:2}
+  else
+    tf_cmd=$*
+  fi
+  terraform $tf_cmd
 }
 
 tf_plan() {
-  cd $terraform_dir
-  terraform plan
+  run_terraform $* plan
 }
 
 tf_apply() {
-  cd $terraform_dir
-  terraform apply --auto-approve
+  run_terraform $* apply --auto-approve
 }
 
 tf_destroy() {
-  cd $terraform_dir
-  terraform destroy --auto-approve
+  run_terraform $* destroy --auto-approve
 }
 
 run_playbook() {
@@ -83,6 +95,7 @@ run_playbook() {
   fi
 }
 
+# Эмуляция преднастройки машин Яндекс.Облака для стандартных образов ОС в гипервизорах
 i_sudo() {
   run_playbook false install_sudo.yml
 }

@@ -1,7 +1,7 @@
 # Управляющие ноды кластера
 module "vm-kube-master" {
   source = "./vm-instance"
-  count  = 3
+  count  = local.kube_master_count[terraform.workspace]
 
   name        = "vm-kube-master-${count.index + 1}"
   user        = "debian"
@@ -19,7 +19,7 @@ module "vm-kube-master" {
 # Рабочая нода кластера
 module "vm-kube-worker" {
   source = "./vm-instance"
-  count  = 3
+  count  = local.kube_worker_count[terraform.workspace]
 
   name        = "vm-kube-worker-${count.index + 1}"
   user        = "debian"
@@ -32,12 +32,4 @@ module "vm-kube-worker" {
   subnet      = local.zones[count.index % length(local.zones)]
   main_disk_image = yandex_compute_image.os-disk.id
   main_disk_size  = 30
-}
-
-locals {
-  zones = ([
-    yandex_vpc_subnet.subnet-kube-a,
-    yandex_vpc_subnet.subnet-kube-b,
-    yandex_vpc_subnet.subnet-kube-c
-  ])
 }

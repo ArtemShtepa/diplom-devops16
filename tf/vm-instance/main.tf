@@ -1,31 +1,70 @@
 # Название машинки
-variable name { default = "" }
+variable "name" {
+  type    = string
+  default = ""
+}
 # Описание машинки
-variable description { default = "" }
+variable "description" {
+  type    = string
+  default = ""
+}
 # Используемая платформа - текстовой идентификатор Яндекс.Облака
-variable platform { default = "standard-v2" }
+variable "platform" {
+  type    = string
+  default = "standard-v2"
+}
 # Число ядер процессора
-variable cpu { default = "2" }
+variable "cpu" {
+  type    = number
+  default = 2
+}
 # Объём оперативной памяти, в Гигабайтах
-variable ram { default = "1" }
+variable "ram" {
+  type    = number
+  default = 1
+}
 # Гарантированная доля загрузки процессора
-variable cpu_load { default = 5 }
+variable "cpu_load" {
+  type    = number
+  default = 5
+}
 # Прерывемая - может быть остановлена в любой момент
-variable temporary { default = "true" }
+variable "temporary" {
+  type    = bool
+  default = true
+}
 # Образ системного диска
-variable main_disk_image { default = "" }
+variable "main_disk_image" {
+  type    = string
+  default = ""
+}
 # Размер системного диска, в Гигабайтах
-variable main_disk_size { default = "10" }
+variable "main_disk_size" {
+  type    = number
+  default = 10
+}
 # Логин пользователя для которого пробрасывается SSH ключ
-variable user { default = "" }
+variable "user" {
+  type    = string
+  default = ""
+}
 # Файл пробрасываемого SSH ключа
-variable user_key { default = "" }
+variable "user_key" {
+  type    = string
+  default = ""
+}
 # Идентификатор подсети
-variable subnet { default = "" }
+variable "subnet" { default = null }
 # Фиксированный внутренний IP адрес
-variable ip { default = "" }
+variable "ip" {
+  type    = string
+  default = ""
+}
 # Требуется ли подключение машинки к интернету
-variable internet { default = "false" }
+variable "internet" {
+  type    = bool
+  default = false
+}
 
 terraform {
   required_providers {
