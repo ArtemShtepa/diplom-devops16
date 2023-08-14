@@ -11,6 +11,17 @@ resource "yandex_vpc_subnet" "subnet-main" {
   network_id     = yandex_vpc_network.net-master.id
 }
 
+# Виртуальный роутер
+resource "yandex_vpc_route_table" "net-router" {
+  name       = "route-table"
+  network_id = yandex_vpc_network.net-master.id
+
+  static_route {
+    destination_prefix = "0.0.0.0/0"
+    next_hop_address   = module.vm-bastion.internal_ip
+  }
+}
+
 # Подсеть Kubernetes кластера в зоне доступности А
 resource "yandex_vpc_subnet" "subnet-kube-a" {
   name           = "subnet-kube-a"

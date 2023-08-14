@@ -1,0 +1,12 @@
+- name: Clear SSH fingerprints of Yandex.Cloud instances
+  hosts: localhost
+  tasks:
+    - name: Get list of instances internal IP
+      ansible.builtin.shell: "yc compute instance list --format json | jq -r '.[].network_interfaces[0].primary_v4_address.address'"
+      register: ip_res
+    - name: Append to list SSH Bastion IP
+      ansible.builtin.set_fact:
+        ip_list: "{{ ip_res.stdout_lines + [ lookup('ansible.builtin.env', 'BASTION_IP') ] }}"
+    - name: Remove hosts info from known_hosts
+      ansible.builtin.command: "ssh-keygen -R {{ item }}"
+      loop: "{{ ip_list }}"

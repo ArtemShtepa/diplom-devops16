@@ -16,6 +16,8 @@ if ! [ -x "$(command -v yc)" ]; then
   echo 'Yandex CLI is not installed. Use preinit command' >&2
 else
   export TF_VAR_YC_SA_KEY=$(pwd)/$(ls secrets/sa-*-key.json | head -n1)
+  #export TF_VAR_YC_KUBE_MASTERS_IP=$(yc compute instance list --format json | jq -r '.[] | select(.name? | match("vm-kube-master-*")) | .network_interfaces[0].primary_v4_address.address')
+  #export TF_VAR_YC_KUBE_WORKERS_IP=$(yc compute instance list --format json | jq -r '.[] | select(.name? | match("vm-kube-worker-*")) | .network_interfaces[0].primary_v4_address.address')
   export TF_VAR_YC_CLOUD_ID=$(yc config get cloud-id)
   export TF_VAR_YC_FOLDER_ID=$(yc config get folder-id)
   #export TF_VAR_YC_ZONE=$(yc config get compute-default-zone)
@@ -76,9 +78,11 @@ tf_plan() {
 
 tf_apply() {
   run_terraform $* apply --auto-approve
+  run_playbook true ssh_add_fp.yml
 }
 
 tf_destroy() {
+  run_playbook true ssh_clear_fp.yml
   run_terraform $* destroy --auto-approve
 }
 

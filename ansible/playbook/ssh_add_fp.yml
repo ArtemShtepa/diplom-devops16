@@ -1,0 +1,10 @@
+- name: Approve SSH fingerprint
+  gather_facts: false
+  hosts: all
+  tasks:
+    - name: Skip question for adding host key
+      ansible.builtin.set_fact:
+        ansible_ssh_common_args: "-o StrictHostKeyChecking=no {{ ansible_ssh_common_args }}"
+    - name: Wait for instances ready
+      ansible.builtin.setup:
+      gather_timeout: 20

@@ -3,7 +3,7 @@ module "vm-bastion" {
   source = "./vm-instance"
 
   name        = "bastion"
-  user        = "debian"
+  user        = "ubuntu"
   user_key    = "../secrets/key_bastion.pub"
   description = "SSH Bastion"
   cpu         = 2
@@ -11,10 +11,11 @@ module "vm-bastion" {
   ip          = "192.168.1.10"
   internet    = true
   subnet      = yandex_vpc_subnet.subnet-main
-  main_disk_image = yandex_compute_image.os-disk.id
-  main_disk_size  = 10
+  # Используется диск NAT-инстанс на основе Ubuntu 18.04
+  main_disk_image = "fd8qmbqk94q6rhb4m94t"
+  main_disk_size  = 3
 }
-
+/*
 # Машинка с Git и CI - GitLab
 module "vm-main-1" {
   source = "./vm-instance"
@@ -48,7 +49,7 @@ module "vm-main-2" {
   main_disk_image = yandex_compute_image.os-disk.id
   main_disk_size  = 20
 }
-
+*/
 # Машинка сборочного цеха и управления кластером
 module "vm-main-3" {
   source = "./vm-instance"
