@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	//"mime"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -15,8 +15,8 @@ import (
 )
 
 var (
-    infoLog   *log.Logger
-    errLog    *log.Logger
+	infoLog   *log.Logger
+	errLog    *log.Logger
 )
 
 func init() {
@@ -25,13 +25,13 @@ func init() {
 }
 
 func renderJSON(w http.ResponseWriter, v interface{}) {
-  js, err := json.Marshal(v)
-  if err != nil {
-    http.Error(w, err.Error(), http.StatusInternalServerError)
-    return
-  }
-  w.Header().Set("Content-Type", "application/json")
-  w.Write(js)
+	js, err := json.Marshal(v)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(js)
 }
 
 func rootHandler(w http.ResponseWriter, req *http.Request) {
@@ -44,6 +44,38 @@ func rootHandler(w http.ResponseWriter, req *http.Request) {
 	m := Message{req.Method, req.URL.Path}
 
 	renderJSON(w, m)
+}
+
+func ipHandler(w http.ResponseWriter, req *http.Request) {
+	l := []string{}
+
+	ifaces, err := net.Interfaces()
+	if err == nil {
+		for _, i := range ifaces {
+			addrs, err := i.Addrs()
+			if err == nil {
+				for _, a := range addrs {
+					switch v := a.(type) {
+					case *net.IPAddr:
+						infoLog.Printf("%v : %s (%s)\n", i.Name, v, v.IP.DefaultMask())
+					case *net.IPNet:
+						infoLog.Printf("%v : %s [%v/%v]\n", i.Name, v, v.IP, v.Mask)
+					}
+				}
+			}
+		}
+	} else {
+		infoLog.Println("Can`t acquire network interfaces: ", err.Error())
+	}
+	host, _ := os.Hostname()
+	addrs, _ := net.LookupIP(host)
+	for _, addr := range addrs {
+		if ipv4 := addr.To4(); ipv4 != nil {
+			l = append(l, fmt.Sprintf("%s", ipv4))
+		}
+	}
+
+	renderJSON(w, l)
 }
 
 func waitHandler(w http.ResponseWriter, req *http.Request) {
@@ -122,6 +154,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", rootHandler)
+	mux.HandleFunc("/ip", ipHandler)
 	mux.HandleFunc("/task/", taskHandler)
 	mux.HandleFunc("/wait/", waitHandler)
 
