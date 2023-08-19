@@ -4,7 +4,7 @@
   tasks:
     - name: Skip question for adding host key
       ansible.builtin.set_fact:
-        ansible_ssh_common_args: "-o StrictHostKeyChecking=no {{ ansible_ssh_common_args }}"
+        ansible_ssh_common_args: "{{ ansible_ssh_common_args }} -o StrictHostKeyChecking=no"
     - name: Wait for instances ready
       ansible.builtin.setup:
-      gather_timeout: 20
+        gather_timeout: 20

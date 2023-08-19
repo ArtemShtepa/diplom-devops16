@@ -3,6 +3,7 @@
 init_dir=$(pwd)
 ansible_dir=$(pwd)/ansible
 terraform_dir=$(pwd)/tf
+storage_name="artemshtepa-devops16"
 
 if ! [ -x "$(command -v ansible)" ]; then
   echo "Ansible not found. Use preinit command" >&2
@@ -15,7 +16,14 @@ fi
 if ! [ -x "$(command -v yc)" ]; then
   echo 'Yandex CLI is not installed. Use preinit command' >&2
 else
-  export TF_VAR_YC_SA_KEY=$(pwd)/$(ls secrets/sa-*-key.json | head -n1)
+  export TF_VAR_YC_SA_FILE=$(pwd)/$(ls secrets/sa_file-*.json | head -n1)
+  export TF_VAR_YC_SA_ID=$(cat $TF_VAR_YC_SA_FILE | jq -r .service_account_id)
+  if ! [ -f secrets/sa_key.json ]; then
+    echo "Generate access key for service account..."
+    yc iam access-key create --service-account-id $TF_VAR_YC_SA_ID --format json > secrets/sa_key.json
+  fi
+  access_key=$(cat secrets/sa_key.json | jq -r .access_key.key_id)
+  secret_key=$(cat secrets/sa_key.json | jq -r .secret)
   #export TF_VAR_YC_KUBE_MASTERS_IP=$(yc compute instance list --format json | jq -r '.[] | select(.name? | match("vm-kube-master-*")) | .network_interfaces[0].primary_v4_address.address')
   #export TF_VAR_YC_KUBE_WORKERS_IP=$(yc compute instance list --format json | jq -r '.[] | select(.name? | match("vm-kube-worker-*")) | .network_interfaces[0].primary_v4_address.address')
   export TF_VAR_YC_CLOUD_ID=$(yc config get cloud-id)
@@ -53,11 +61,20 @@ clear() {
 
 # Инициализация Terraform
 tf_init() {
+  # Проверка существования бакета
+  if ! $(yc storage bucket get $storage_name 2>1 1>/dev/null); then
+    echo "Create S3 storage..."
+    if ! $(yc storage bucket create --name $storage_name 2>1 1>/dev/null); then
+      echo "FAIL! Can't create bucket. May be name is already used?"
+      exit
+    fi
+  fi
   cd $terraform_dir
-  terraform init
+  terraform init -backend-config="access_key=$access_key" -backend-config="secret_key=$secret_key" -backend-config="bucket=$storage_name"
+  #terraform providers lock -platform=linux_amd64
   # Создание рабочих пространств
-  terraform workspace new stage
-  terraform workspace new prod
+  #terraform workspace new stage
+  #terraform workspace new prod
 }
 
 run_terraform() {
@@ -82,8 +99,9 @@ tf_apply() {
 }
 
 tf_destroy() {
-  run_playbook true ssh_clear_fp.yml
+  run_playbook false ssh_clear_fp.yml
   run_terraform $* destroy --auto-approve
+  yc storage bucket delete --name $storage_name
 }
 
 run_playbook() {
@@ -142,6 +160,47 @@ i_kube_pre() {
 
 i_kube_cl() {
   run_playbook true install_kube-cluster.yml
+}
+
+ssh_lb() {
+  check_bastion
+  ssh ubuntu@$BASTION_IP -i secrets/key_bastion
+}
+ssh_lm1() {
+  check_bastion
+  ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion ubuntu@$BASTION_IP" debian@192.168.1.11 -i secrets/key_kube
+}
+ssh_lm3() {
+  check_bastion
+  ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion ubuntu@$BASTION_IP" debian@192.168.1.12 -i secrets/key_kube
+}
+ssh_lm3() {
+  check_bastion
+  ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion ubuntu@$BASTION_IP" debian@192.168.1.13 -i secrets/key_kube
+}
+ssh_lkm1() {
+  check_bastion
+  ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion ubuntu@$BASTION_IP" debian@192.168.10.51 -i secrets/key_kube
+}
+ssh_lkm3() {
+  check_bastion
+  ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion ubuntu@$BASTION_IP" debian@192.168.20.51 -i secrets/key_kube
+}
+ssh_lkm3() {
+  check_bastion
+  ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion ubuntu@$BASTION_IP" debian@192.168.30.51 -i secrets/key_kube
+}
+ssh_lkw1() {
+  check_bastion
+  ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion ubuntu@$BASTION_IP" debian@192.168.10.101 -i secrets/key_kube
+}
+ssh_lkw3() {
+  check_bastion
+  ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion ubuntu@$BASTION_IP" debian@192.168.20.101 -i secrets/key_kube
+}
+ssh_lkw3() {
+  check_bastion
+  ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion ubuntu@$BASTION_IP" debian@192.168.30.101 -i secrets/key_kube
 }
 
 if [ $1 ]; then
