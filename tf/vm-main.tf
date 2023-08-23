@@ -15,7 +15,7 @@ module "vm-bastion" {
   main_disk_image = "fd8qmbqk94q6rhb4m94t"
   main_disk_size  = 3
 }
-/*
+
 # Машинка с Git и CI - GitLab
 module "vm-main-1" {
   source = "./vm-instance"
@@ -49,7 +49,7 @@ module "vm-main-2" {
   main_disk_image = yandex_compute_image.os-disk.id
   main_disk_size  = 20
 }
-*/
+
 # Машинка сборочного цеха и управления кластером
 module "vm-main-3" {
   source = "./vm-instance"

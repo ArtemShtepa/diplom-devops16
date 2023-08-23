@@ -10,7 +10,7 @@ resource "yandex_vpc_route_table" "net-router" {
 
   static_route {
     destination_prefix = "0.0.0.0/0"
-    next_hop_address   = module.vm-bastion.internal_ip
+    next_hop_address   = "192.168.1.10"
   }
 }
 

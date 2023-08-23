@@ -1,3 +1,16 @@
+- name: Wait for all instances ready
+  hosts: localhost
+  tasks:
+    - name: Get information from YC CLI
+      ansible.builtin.shell: "yc compute instance list --format json | jq -r '.[] | .status'"
+      delegate_to: localhost
+      register: yci_res
+      until:
+        - yci_res.stdout_lines | unique | count == 1
+        - yci_res.stdout_lines[0] == 'RUNNING'
+      retries: 10
+      delay: 20
+
 - name: Approve SSH fingerprint
   gather_facts: false
   hosts: all

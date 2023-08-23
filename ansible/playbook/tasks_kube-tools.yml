@@ -47,7 +47,7 @@
 - name: Reboot machine
   become: true
   ansible.builtin.reboot:
-    post_reboot_delay: 10
-    reboot_timeout: 40
-    connect_timeout: 60
+    post_reboot_delay: 20
+    reboot_timeout: 120
+    connect_timeout: 180
     test_command: uptime

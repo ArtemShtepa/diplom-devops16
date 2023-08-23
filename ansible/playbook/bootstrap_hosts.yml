@@ -1,6 +1,17 @@
 ---
+- name: Update package cache
+  hosts: all
+  tasks:
+    - name: Use universal module
+      become: true
+      ansible.builtin.package:
+        update_cache: true
+
 - name: Install sudo package with root
   hosts: all
+  tags:
+    - never
+    - sudo
   vars:
     ansible_ssh_common_args: ""
   tasks:
@@ -18,9 +29,4 @@
       ansible.builtin.copy:
         dest: "/etc/sudoers.d/{{ remote_user }}"
         content: "{{ remote_user }} ALL=(ALL:ALL) NOPASSWD:ALL"
-    - name: Update cache for APT
-      become: true
-      ansible.builtin.apt:
-        update_cache: true
-      when: ansible_pkg_mgr == "apt"
 ...

@@ -40,7 +40,6 @@ check_bastion() {
   else
     echo "Use SSH Bastion at $BASTION_IP";
   fi
-  cd $ansible_dir
 }
 
 preinit() {
@@ -73,8 +72,9 @@ tf_init() {
   terraform init -backend-config="access_key=$access_key" -backend-config="secret_key=$secret_key" -backend-config="bucket=$storage_name"
   #terraform providers lock -platform=linux_amd64
   # Создание рабочих пространств
-  #terraform workspace new stage
-  #terraform workspace new prod
+  terraform workspace new stage
+  terraform workspace new prod
+  terraform workspace select stage
 }
 
 run_terraform() {
@@ -95,7 +95,7 @@ tf_plan() {
 
 tf_apply() {
   run_terraform $* apply --auto-approve
-  run_playbook true ssh_add_fp.yml
+  run_playbook true ssh_add_fp.yml bootstrap_hosts.yml
 }
 
 tf_destroy() {
@@ -108,9 +108,8 @@ run_playbook() {
   if [ "$#" -gt 1 ]; then
     if [ $1 == "true" ]; then
       check_bastion
-    else
-      cd $ansible_dir
     fi
+    cd $ansible_dir
     for pb in ${@:2}; do
       ansible-playbook -i inventory playbook/$pb
     done
@@ -119,7 +118,9 @@ run_playbook() {
 
 # Эмуляция преднастройки машин Яндекс.Облака для стандартных образов ОС в гипервизорах
 i_sudo() {
-  run_playbook false install_sudo.yml
+  check_bastion
+  cd $ansible_dir
+  ansible-playbook -i inventory playbook/bootstrap_vm.yml --tags sudo
 }
 
 i_podman() {
@@ -150,8 +151,12 @@ i_runner() {
   run_playbook true install_runner.yml
 }
 
+i_update() {
+  run_playbook true bootstrap_hosts.yml
+}
+
 i_bastion() {
-  run_playbook true install_bastion.yml
+  run_playbook true configure_bastion.yml
 }
 
 i_kube_pre() {
@@ -162,43 +167,43 @@ i_kube_cl() {
   run_playbook true install_kube-cluster.yml
 }
 
-ssh_lb() {
+ssh_b() {
   check_bastion
   ssh ubuntu@$BASTION_IP -i secrets/key_bastion
 }
-ssh_lm1() {
+ssh_m1() {
   check_bastion
-  ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion ubuntu@$BASTION_IP" debian@192.168.1.11 -i secrets/key_kube
+  ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion ubuntu@$BASTION_IP" debian@192.168.1.11 -i secrets/key_machine
 }
-ssh_lm3() {
+ssh_m2() {
   check_bastion
-  ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion ubuntu@$BASTION_IP" debian@192.168.1.12 -i secrets/key_kube
+  ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion ubuntu@$BASTION_IP" debian@192.168.1.12 -i secrets/key_machine
 }
-ssh_lm3() {
+ssh_m3() {
   check_bastion
-  ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion ubuntu@$BASTION_IP" debian@192.168.1.13 -i secrets/key_kube
+  ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion ubuntu@$BASTION_IP" debian@192.168.1.13 -i secrets/key_machine
 }
-ssh_lkm1() {
+ssh_km1() {
   check_bastion
   ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion ubuntu@$BASTION_IP" debian@192.168.10.51 -i secrets/key_kube
 }
-ssh_lkm3() {
+ssh_km2() {
   check_bastion
   ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion ubuntu@$BASTION_IP" debian@192.168.20.51 -i secrets/key_kube
 }
-ssh_lkm3() {
+ssh_km3() {
   check_bastion
   ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion ubuntu@$BASTION_IP" debian@192.168.30.51 -i secrets/key_kube
 }
-ssh_lkw1() {
+ssh_kw1() {
   check_bastion
   ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion ubuntu@$BASTION_IP" debian@192.168.10.101 -i secrets/key_kube
 }
-ssh_lkw3() {
+ssh_kw2() {
   check_bastion
   ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion ubuntu@$BASTION_IP" debian@192.168.20.101 -i secrets/key_kube
 }
-ssh_lkw3() {
+ssh_kw3() {
   check_bastion
   ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion ubuntu@$BASTION_IP" debian@192.168.30.101 -i secrets/key_kube
 }
@@ -212,8 +217,9 @@ else
   echo "  tf_plan      - Terraform plan"
   echo "  tf_apply     - Apply Terraform plan"
   echo "  tf_destroy   - Destroy Terraform plan"
-  echo "  i_bastion    - Install SSH Bastion"
-  echo "  i_sudo       - Prepare hosts"
+  echo "  i_update     - Update hosts package cache"
+  echo "  i_bastion    - Configure SSH Bastion"
+  echo "  i_sudo       - Configure hosts similarly to the YC instance"
   echo "  i_podman     - Install Podman"
   echo "  i_gitlab     - Install GitLab CE"
   echo "  i_monitoring - Install InfluxDB + Grafana + Telegraf"
