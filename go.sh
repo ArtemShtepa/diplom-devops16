@@ -61,9 +61,9 @@ clear() {
 # Инициализация Terraform
 tf_init() {
   # Проверка существования бакета
-  if ! $(yc storage bucket get $storage_name 2>1 1>/dev/null); then
+  if ! $(yc storage bucket get $storage_name 1>/dev/null 2>&1); then
     echo "Create S3 storage..."
-    if ! $(yc storage bucket create --name $storage_name 2>1 1>/dev/null); then
+    if ! $(yc storage bucket create --name $storage_name 1>/dev/null 2>&1); then
       echo "FAIL! Can't create bucket. May be name is already used?"
       exit
     fi
