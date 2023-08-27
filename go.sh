@@ -95,11 +95,11 @@ tf_plan() {
 
 tf_apply() {
   run_terraform $* apply --auto-approve
-  run_playbook true ssh_add_fp.yml bootstrap_hosts.yml
+  run_playbook true ssh_add_fp.yml
 }
 
 tf_destroy() {
-  run_playbook false ssh_clear_fp.yml
+  run_playbook true ssh_clear_fp.yml
   run_terraform $* destroy --auto-approve
   yc storage bucket delete --name $storage_name
 }

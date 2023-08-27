@@ -1,23 +1,71 @@
-- name: Wait for all instances ready
-  hosts: localhost
+- name: Wait for SSH Bastion ready
+  gather_facts: false
+  hosts: bastion
   tasks:
-    - name: Get information from YC CLI
-      ansible.builtin.shell: "yc compute instance list --format json | jq -r '.[] | .status'"
+    - name: Check fingerprint existance
+      ansible.builtin.command: "ssh-keygen -F {{ bastion_host }}"
       delegate_to: localhost
-      register: yci_res
-      until:
-        - yci_res.stdout_lines | unique | count == 1
-        - yci_res.stdout_lines[0] == 'RUNNING'
-      retries: 10
-      delay: 20
+      changed_when: false
+      register: fp_res
+    - block:
+      - name: Add SSH Bastion fingerprint
+        ansible.builtin.shell:
+          ssh -o StrictHostKeyChecking=no
+          {{ bastion_user }}@{{ bastion_host }} -i {{ playbook_dir }}/../{{ bastion_key }}
+          echo Success!
+        delegate_to: localhost
+        register: res
+        retries: 6
+        delay: 10
+        until: res.rc == 0
+      - name: Detect package manager
+        ansible.builtin.setup:
+          gather_subset: ["pkg_mgr"]
+      - name: Update package manager cache
+        become: true
+        ansible.builtin.package:
+          update_cache: true
+      when:
+        - bastion_host != ""
+        - fp_res.stdout_lines | count == 0
 
-- name: Approve SSH fingerprint
+- name: Wait for other instances ready
   gather_facts: false
   hosts: all
   tasks:
-    - name: Skip question for adding host key
-      ansible.builtin.set_fact:
-        ansible_ssh_common_args: "{{ ansible_ssh_common_args }} -o StrictHostKeyChecking=no"
-    - name: Wait for instances ready
-      ansible.builtin.setup:
-        gather_timeout: 20
+    - name: Check fingerprint existance
+      ansible.builtin.command: "ssh-keygen -F {{ ansible_host }}"
+      delegate_to: localhost
+      changed_when: false
+      ignore_errors: true
+      register: fp_res
+    - block:
+      - name: Check internal IP from YC CLI
+        ansible.builtin.shell: "yc compute instance list --format json | jq -r '.[] | select(.network_interfaces[0].primary_v4_address.address? | match(\"{{ ansible_host }}\")) | .network_interfaces[0].primary_v4_address.address'"
+        changed_when: false
+        delegate_to: localhost
+        register: yci_res
+      - block:
+        - name: Add instance fingerprint
+          ansible.builtin.shell:
+            ssh -o StrictHostKeyChecking=no
+            -o ProxyCommand="ssh -p {{ bastion_port }} -W %h:%p -q
+            -i {{ playbook_dir }}/../{{ bastion_key }} {{ bastion_user }}@{{ bastion_host }}"
+            {{ ansible_user }}@{{ ansible_host }} -i {{ playbook_dir }}/../{{ ansible_ssh_private_key_file }}
+            echo Success!
+          delegate_to: localhost
+          register: res
+          retries: 6
+          delay: 10
+          until: res.rc == 0
+        - name: Detect package manager
+          ansible.builtin.setup:
+            gather_subset: ["pkg_mgr"]
+        - name: Update package manager cache
+          become: true
+          ansible.builtin.package:
+            update_cache: true
+        when: yci_res.stdout_lines | count == 1
+      when:
+        - fp_res.stdout_lines | count == 0
+        - bastion_host != ""
