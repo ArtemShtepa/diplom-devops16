@@ -6,6 +6,7 @@
       ansible.builtin.command: "ssh-keygen -F {{ bastion_host }}"
       delegate_to: localhost
       changed_when: false
+      ignore_errors: true
       register: fp_res
     - block:
       - name: Add SSH Bastion fingerprint
@@ -28,6 +29,9 @@
       when:
         - bastion_host != ""
         - fp_res.stdout_lines | count == 0
+
+- name: Add kubernetes hosts
+  ansible.builtin.import_playbook: dynamic_inv.yml
 
 - name: Wait for other instances ready
   gather_facts: false

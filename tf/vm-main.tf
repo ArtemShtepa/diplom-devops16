@@ -2,7 +2,7 @@
 module "vm-bastion" {
   source = "./vm-instance"
 
-  name        = "bastion"
+  name        = "${terraform.workspace}-bastion"
   user        = "ubuntu"
   user_key    = "../secrets/key_bastion.pub"
   description = "SSH Bastion"
@@ -20,7 +20,7 @@ module "vm-bastion" {
 module "vm-main-1" {
   source = "./vm-instance"
 
-  name        = "vm-main-1"
+  name        = "${terraform.workspace}-vm-1"
   user        = "debian"
   user_key    = "../secrets/key_machine.pub"
   description = "GitLab"
@@ -37,7 +37,7 @@ module "vm-main-1" {
 module "vm-main-2" {
   source = "./vm-instance"
 
-  name        = "vm-main-2"
+  name        = "${terraform.workspace}-vm-2"
   user        = "debian"
   user_key    = "../secrets/key_machine.pub"
   description = "InfluxDB and Grafana"
@@ -54,7 +54,7 @@ module "vm-main-2" {
 module "vm-main-3" {
   source = "./vm-instance"
 
-  name        = "vm-main-3"
+  name        = "${terraform.workspace}-vm-3"
   user        = "debian"
   user_key    = "../secrets/key_machine.pub"
   description = "CI Runner and Kube proxy"

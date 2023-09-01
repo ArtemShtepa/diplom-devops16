@@ -3,7 +3,7 @@ module "vm-kube-master" {
   source = "./vm-instance"
   count  = local.kube_master_count[terraform.workspace]
 
-  name        = "vm-kube-master-${count.index + 1}"
+  name        = "${terraform.workspace}-kube-master-${count.index + 1}"
   user        = "debian"
   user_key    = "../secrets/key_kube.pub"
   description = "Kube Master ${count.index + 1}"
@@ -21,7 +21,7 @@ module "vm-kube-worker" {
   source = "./vm-instance"
   count  = local.kube_worker_count[terraform.workspace]
 
-  name        = "vm-kube-worker-${count.index + 1}"
+  name        = "${terraform.workspace}-kube-worker-${count.index + 1}"
   user        = "debian"
   user_key    = "../secrets/key_kube.pub"
   description = "Kube Worker ${count.index + 1}"

@@ -1,0 +1,38 @@
+---
+- name: Generate dynamic inventory for Kubernetes cluster hosts
+  gather_facts: false
+  hosts: localhost
+  vars:
+    tf_workspace: "{{ lookup('ansible.builtin.env', 'TF_WORKSPACE') }}"
+  tasks:
+    - name: Search kubernetes master instances
+      ansible.builtin.shell: "yc compute instance list --format json | jq '[ .[] | select(.name? | match(\"{{ tf_workspace }}-kube-master-*\")) ]'"
+      register: yc_instances
+      failed_when: yc_instances.rc != 0
+      changed_when: false
+    - name: Add instances kube-master group
+      ansible.builtin.add_host:
+        groups:
+          - kube_nodes
+          - kube_master
+        ansible_host: "{{ item['network_interfaces'][0]['primary_v4_address']['address'] }}"
+        ansible_ssh_user: "{{ item['boot_disk']['device_name'] }}"
+        host: "{{ item['name'] }}"
+      loop: "{{ yc_instances.stdout | from_json }}"
+      changed_when: false
+    - name: Search kubernetes worker instances
+      ansible.builtin.shell: "yc compute instance list --format json | jq '[ .[] | select(.name? | match(\"{{ tf_workspace }}-kube-worker-*\")) ]'"
+      register: yc_instances
+      failed_when: yc_instances.rc != 0
+      changed_when: false
+    - name: Add instances kube-worker group
+      ansible.builtin.add_host:
+        groups:
+          - kube_nodes
+          - kube_worker
+        ansible_host: "{{ item['network_interfaces'][0]['primary_v4_address']['address'] }}"
+        ansible_ssh_user: "{{ item['boot_disk']['device_name'] }}"
+        host: "{{ item['name'] }}"
+      loop: "{{ yc_instances.stdout | from_json }}"
+      changed_when: false
+...

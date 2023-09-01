@@ -1,3 +1,6 @@
+- name: Add kubernetes hosts
+  ansible.builtin.import_playbook: dynamic_inv.yml
+
 - name: Clear SSH fingerprints of Yandex.Cloud instances
   hosts: localhost
   vars:

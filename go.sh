@@ -1,22 +1,42 @@
 #!/usr/bin/env bash
 
+# Текущая директория
 init_dir=$(pwd)
+# Каталог расположения файлов Ansible
 ansible_dir=$(pwd)/ansible
+# Каталог расположения файлов Terraform
 terraform_dir=$(pwd)/tf
+# Имя S3 бакета - должно быть уникально для всего Яндекс.Облака
 storage_name="artemshtepa-devops16"
+# Имя сервисного аккаунта
+sa_name="sa-diplom"
+# Дополнение к имени файла сервисного аккаунта
+sa_file="diplom"
 
 if ! [ -x "$(command -v ansible)" ]; then
-  echo "Ansible not found. Use preinit command" >&2
+  echo "Ansible not found. Use init command" >&2
 fi
 
 if ! [ -x "$(command -v terraform)" ]; then
-  echo 'Terraform is not installed. Use preinit command' >&2
+  echo 'Terraform is not installed. Use init command' >&2
 fi
 
+get_yc_vars() {
+  yc_cloud=$(yc config get cloud-id 2>/dev/null)
+  if [ $? -eq 0 ]; then
+    export export TF_VAR_YC_CLOUD_ID=$yc_cloud
+  fi
+  yc_folder=$(yc config get folder-id 2>/dev/null)
+  if [ $? -eq 0 ]; then
+    export TF_VAR_YC_FOLDER_ID=$yc_folder
+  fi
+  #export TF_VAR_YC_ZONE=$(yc config get compute-default-zone)
+}
+
 if ! [ -x "$(command -v yc)" ]; then
-  echo 'Yandex CLI is not installed. Use preinit command' >&2
+  echo 'Yandex CLI is not installed. Use init command' >&2
 else
-  export TF_VAR_YC_SA_FILE=$(pwd)/$(ls secrets/sa_file-*.json | head -n1)
+  export TF_VAR_YC_SA_FILE=$(pwd)/$(ls secrets/sa_file*.json | head -n1)
   export TF_VAR_YC_SA_ID=$(cat $TF_VAR_YC_SA_FILE | jq -r .service_account_id)
   if ! [ -f secrets/sa_key.json ]; then
     echo "Generate access key for service account..."
@@ -24,16 +44,73 @@ else
   fi
   access_key=$(cat secrets/sa_key.json | jq -r .access_key.key_id)
   secret_key=$(cat secrets/sa_key.json | jq -r .secret)
-  #export TF_VAR_YC_KUBE_MASTERS_IP=$(yc compute instance list --format json | jq -r '.[] | select(.name? | match("vm-kube-master-*")) | .network_interfaces[0].primary_v4_address.address')
-  #export TF_VAR_YC_KUBE_WORKERS_IP=$(yc compute instance list --format json | jq -r '.[] | select(.name? | match("vm-kube-worker-*")) | .network_interfaces[0].primary_v4_address.address')
-  export TF_VAR_YC_CLOUD_ID=$(yc config get cloud-id)
-  export TF_VAR_YC_FOLDER_ID=$(yc config get folder-id)
-  #export TF_VAR_YC_ZONE=$(yc config get compute-default-zone)
+  get_yc_vars
 fi
 
-check_bastion() {
+create_ssh_key() {
+  if ! [ -f "secrets/key_$1" ]; then
+    echo "Generate SSH key for $1..."
+    ssh-keygen -t ed25519 -N '' -f secrets/key_$1 <<< $'\ny' >/dev/null 2>&1
+  fi
+}
+
+init() {
+  if ! [ -x "$(command -v ansible)" ]; then
+    echo "Install Ansible..."
+    python3 -m pip install --upgrade --user ansible
+  fi
+  chmod 0600 $init_dir/secrets/*
+  echo "Install YC CLI and Terraform..."
+  run_playbook false configure_yc+tf.yml
   cd $init_dir
-  export BASTION_IP=$(yc compute instance list --format json | jq -r '.[] | select( .name == "bastion" ) | .network_interfaces[].primary_v4_address.one_to_one_nat.address')
+  # Инициализирование YC CLI
+  while [ $TF_VAR_YC_CLOUD_ID = "" ] || [ $TF_VAR_YC_FOLDER_ID = "" ]; do
+    yc init
+    get_yc_vars
+  done
+  # Создание сервисного аккаунта
+  if ! $(yc iam service-account get $sa_name 1>/dev/null 2>&1); then
+    echo "Create service account..."
+    yc iam service-account create --name $sa_name
+    echo "Add access rights..."
+    yc iam service-account add-access-binding --name $sa_name --role editor --service-account-name $sa_name
+    echo "Grant access rights to folder..."
+    yc resource-manager folder --id $TF_VAR_YC_FOLDER_ID add-access-binding --role editor --service-account-name $sa_name
+    echo "Generate account access file..."
+    yc iam key create --service-account-name $sa_name -o secrets/sa_file-$sa_file.json
+    echo "Generate access key for service account..."
+    yc iam access-key create --service-account-name $sa_name --format json > secrets/sa_key.json
+  fi
+  create_ssh_key bastion
+  create_ssh_key kube
+  create_ssh_key machine
+  # Создание бакета
+  if ! $(yc storage bucket get $storage_name 1>/dev/null 2>&1); then
+    echo "Create S3 storage..."
+    if ! $(yc storage bucket create --name $storage_name 1>/dev/null 2>&1); then
+      echo "FAIL! Can't create bucket. May be name is already used?"
+      exit
+    fi
+  fi
+}
+
+clean() {
+  cd $init_dir
+  rm ansible/playbook/files/_*
+  rm tf/terraform*
+  rm -r tf/.terraform
+  rm tf/.terraform.*
+  echo "Destroy S3 storage..."
+  yc storage bucket delete --name $storage_name
+  echo "Delete service account..."
+  yc iam service-account delete --name $sa_name
+}
+
+check_bastion() {
+  cd $terraform_dir
+  export TF_WORKSPACE=$(terraform workspace show)
+  cd $init_dir
+  export BASTION_IP=$(yc compute instance list --format json | jq -r '.[] | select( .name == "'$TF_WORKSPACE'-bastion" ) | .network_interfaces[].primary_v4_address.one_to_one_nat.address')
   if [ -z "$BASTION_IP" ]; then
     echo "SSH Bastion does not exist or is not configured as NAT"
     exit 1
@@ -42,34 +119,10 @@ check_bastion() {
   fi
 }
 
-preinit() {
-  if ! [ -x "$(command -v ansible)" ]; then
-    python3 -m pip install --upgrade --user ansible
-  fi
-  chmod 0600 $init_dir/secrets/*
-  run_playbook false configure_yc+tf.yml
-}
-
-clear() {
-  cd $init_dir
-  rm ansible/playbook/files/_*
-  rm tf/terraform*
-  rm -r tf/.terraform
-  rm tf/.terraform.*
-}
-
 # Инициализация Terraform
 tf_init() {
-  # Проверка существования бакета
-  if ! $(yc storage bucket get $storage_name 1>/dev/null 2>&1); then
-    echo "Create S3 storage..."
-    if ! $(yc storage bucket create --name $storage_name 1>/dev/null 2>&1); then
-      echo "FAIL! Can't create bucket. May be name is already used?"
-      exit
-    fi
-  fi
   cd $terraform_dir
-  terraform init -backend-config="access_key=$access_key" -backend-config="secret_key=$secret_key" -backend-config="bucket=$storage_name"
+  terraform init -reconfigure -backend-config="access_key=$access_key" -backend-config="secret_key=$secret_key" -backend-config="bucket=$storage_name"
   #terraform providers lock -platform=linux_amd64
   # Создание рабочих пространств
   terraform workspace new stage
@@ -101,7 +154,6 @@ tf_apply() {
 tf_destroy() {
   run_playbook true ssh_clear_fp.yml
   run_terraform $* destroy --auto-approve
-  yc storage bucket delete --name $storage_name
 }
 
 run_playbook() {
@@ -212,14 +264,14 @@ if [ $1 ]; then
   $*
 else
   echo "Possible commands:"
-  echo "  preinit      - Download and configure YC CLI and Terraform"
-  echo "  tf_init      - Terraform init"
-  echo "  tf_plan      - Terraform plan"
+  echo "  init         - Install Ansible,YC CLI,Terraform and preconfigure YC"
+  echo "  tf_init      - Run Terraform init"
+  echo "  tf_plan      - Print Terraform plan"
   echo "  tf_apply     - Apply Terraform plan"
   echo "  tf_destroy   - Destroy Terraform plan"
   echo "  i_update     - Update hosts package cache"
   echo "  i_bastion    - Configure SSH Bastion"
-  echo "  i_sudo       - Configure hosts similarly to the YC instance"
+  echo "  i_sudo       - Configure hosts similarly to the YC instance (local VM)"
   echo "  i_podman     - Install Podman"
   echo "  i_gitlab     - Install GitLab CE"
   echo "  i_monitoring - Install InfluxDB + Grafana + Telegraf"
@@ -229,5 +281,5 @@ else
   echo "  i_runner     - Install GitLab Runner"
   echo "  i_kube_pre   - Install Kubernetes Prerequirements"
   echo "  i_kube_cl    - Install Kubernetes Cluster"
-  echo "  clear        - Clear temporary files"
+  echo "  clean        - Destroy preconfigured YC resources and clear temporary files"
 fi

@@ -166,7 +166,7 @@
 1. Документация по языку [Terraform](https://developer.hashicorp.com/terraform/language)
 
 ### Документация Kubernetes и связанного с ним
-1. Установке [kubeadm](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/)
+1. Установка [kubeadm](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/)
 1. [Отказоустойчивый кластер](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/)
 1. Репозиторий Kubeadm: [Советы по отказоустойчивости кластера](https://github.com/kubernetes/kubeadm/blob/main/docs/ha-considerations.md#options-for-software-load-balancing)
 1. Допусимые [Container runtimes](https://kubernetes.io/docs/setup/production-environment/container-runtimes/)

@@ -1,4 +1,7 @@
 ---
+- name: Add kubernetes hosts
+  ansible.builtin.import_playbook: dynamic_inv.yml
+
 - name: Check cluster presence
   hosts: kube_nodes
   tasks:

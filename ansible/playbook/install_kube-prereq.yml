@@ -1,4 +1,7 @@
 ---
+- name: Add kubernetes hosts
+  ansible.builtin.import_playbook: dynamic_inv.yml
+
 - name: Prepare kube cluster hosts
   hosts: kube_nodes
   become: true
@@ -75,6 +78,8 @@
       ansible.builtin.package:
         name: "haproxy"
         state: present
+    - debug:
+        msg: "{{ groups['kube_master'] }}"
     - name: Generate HAProxy configuration file
       ansible.builtin.template:
         src: "haproxy_kubeapi.cfg.jinja2"
