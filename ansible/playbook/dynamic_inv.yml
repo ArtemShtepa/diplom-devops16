@@ -16,7 +16,7 @@
           - kube_nodes
           - kube_master
         ansible_host: "{{ item['network_interfaces'][0]['primary_v4_address']['address'] }}"
-        ansible_ssh_user: "{{ item['boot_disk']['device_name'] }}"
+        ansible_user: "{{ item['boot_disk']['device_name'] }}"
         host: "{{ item['name'] }}"
       loop: "{{ yc_instances.stdout | from_json }}"
       changed_when: false
@@ -31,7 +31,7 @@
           - kube_nodes
           - kube_worker
         ansible_host: "{{ item['network_interfaces'][0]['primary_v4_address']['address'] }}"
-        ansible_ssh_user: "{{ item['boot_disk']['device_name'] }}"
+        ansible_user: "{{ item['boot_disk']['device_name'] }}"
         host: "{{ item['name'] }}"
       loop: "{{ yc_instances.stdout | from_json }}"
       changed_when: false

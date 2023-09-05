@@ -97,9 +97,9 @@ init() {
 clean() {
   cd $init_dir
   rm ansible/playbook/files/_*
-  rm tf/terraform*
+  rm -r tf/terraform*
   rm -r tf/.terraform
-  rm tf/.terraform.*
+  rm -r tf/.terraform.*
   echo "Destroy S3 storage..."
   yc storage bucket delete --name $storage_name
   echo "Delete service account..."
@@ -219,45 +219,26 @@ i_kube_cl() {
   run_playbook true install_kube-cluster.yml
 }
 
-ssh_b() {
+run_vm() {
   check_bastion
-  ssh ubuntu@$BASTION_IP -i secrets/key_bastion
-}
-ssh_m1() {
-  check_bastion
-  ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion ubuntu@$BASTION_IP" debian@192.168.1.11 -i secrets/key_machine
-}
-ssh_m2() {
-  check_bastion
-  ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion ubuntu@$BASTION_IP" debian@192.168.1.12 -i secrets/key_machine
-}
-ssh_m3() {
-  check_bastion
-  ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion ubuntu@$BASTION_IP" debian@192.168.1.13 -i secrets/key_machine
-}
-ssh_km1() {
-  check_bastion
-  ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion ubuntu@$BASTION_IP" debian@192.168.10.51 -i secrets/key_kube
-}
-ssh_km2() {
-  check_bastion
-  ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion ubuntu@$BASTION_IP" debian@192.168.20.51 -i secrets/key_kube
-}
-ssh_km3() {
-  check_bastion
-  ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion ubuntu@$BASTION_IP" debian@192.168.30.51 -i secrets/key_kube
-}
-ssh_kw1() {
-  check_bastion
-  ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion ubuntu@$BASTION_IP" debian@192.168.10.101 -i secrets/key_kube
-}
-ssh_kw2() {
-  check_bastion
-  ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion ubuntu@$BASTION_IP" debian@192.168.20.101 -i secrets/key_kube
-}
-ssh_kw3() {
-  check_bastion
-  ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion ubuntu@$BASTION_IP" debian@192.168.30.101 -i secrets/key_kube
+  if [ "$1" == "" ]; then
+    echo "Specify host name to connect without '$TF_WORKSPACE-'"
+    yc compute instance list
+  else
+    if [ "$1" == "bastion" ]; then
+      ssh ubuntu@$BASTION_IP -i secrets/key_bastion
+    else
+      cmd=${@:2}
+      ip=$(yc compute instance list --format json | jq -r '.[] | select(.name? | match("'$TF_WORKSPACE'-'$1'")) | .network_interfaces[0].primary_v4_address.address')
+      if [ "$ip" == "" ]; then
+        echo "Host name '$1' not exists"
+      elif [[ $ip == "kube*" ]]; then
+        ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion ubuntu@$BASTION_IP" debian@$ip -i secrets/key_kube $cmd
+      else
+        ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion ubuntu@$BASTION_IP" debian@$ip -i secrets/key_machine $cmd
+      fi
+    fi
+  fi
 }
 
 if [ $1 ]; then
@@ -281,5 +262,6 @@ else
   echo "  i_runner     - Install GitLab Runner"
   echo "  i_kube_pre   - Install Kubernetes Prerequirements"
   echo "  i_kube_cl    - Install Kubernetes Cluster"
+  echo "  run_vm       - Run SSH session or command on remote machine"
   echo "  clean        - Destroy preconfigured YC resources and clear temporary files"
 fi
