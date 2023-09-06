@@ -109,8 +109,9 @@ clean() {
 check_bastion() {
   cd $terraform_dir
   export TF_WORKSPACE=$(terraform workspace show)
+  echo "Use terraform workspace: $TF_WORKSPACE"
   cd $init_dir
-  export BASTION_IP=$(yc compute instance list --format json | jq -r '.[] | select( .name == "'$TF_WORKSPACE'-bastion" ) | .network_interfaces[].primary_v4_address.one_to_one_nat.address')
+  export BASTION_IP=$(yc compute instance list --format json | jq -r '.[] | select(.name == "'$TF_WORKSPACE'-bastion") | .network_interfaces[].primary_v4_address.one_to_one_nat.address')
   if [ -z "$BASTION_IP" ]; then
     echo "SSH Bastion does not exist or is not configured as NAT"
     exit 1
@@ -229,7 +230,7 @@ run_vm() {
       ssh ubuntu@$BASTION_IP -i secrets/key_bastion
     else
       cmd=${@:2}
-      ip=$(yc compute instance list --format json | jq -r '.[] | select(.name? | match("'$TF_WORKSPACE'-'$1'")) | .network_interfaces[0].primary_v4_address.address')
+      ip=$(yc compute instance list --format json | jq -r '.[] | select(.name == "'$TF_WORKSPACE'-'$1'") | .network_interfaces[0].primary_v4_address.address')
       if [ "$ip" == "" ]; then
         echo "Host name '$1' not exists"
       elif [[ $ip == "kube*" ]]; then
@@ -239,6 +240,19 @@ run_vm() {
       fi
     fi
   fi
+}
+
+rearm() {
+  c=0
+  for n in $(yc compute instance list --format json | jq -r '.[] | select(.status != "RUNNING") | .name'); do
+    echo "Rearm instance: $n ..."
+    yc compute instance start $n
+    ((c++))
+  done
+  if [[ $c == 0 ]]; then
+    run_playbook true ssh_add_fp.yml
+  fi
+  echo $c
 }
 
 if [ $1 ]; then
@@ -263,5 +277,6 @@ else
   echo "  i_kube_pre   - Install Kubernetes Prerequirements"
   echo "  i_kube_cl    - Install Kubernetes Cluster"
   echo "  run_vm       - Run SSH session or command on remote machine"
+  echo "  rearm        - Start stopped YC instances"
   echo "  clean        - Destroy preconfigured YC resources and clear temporary files"
 fi

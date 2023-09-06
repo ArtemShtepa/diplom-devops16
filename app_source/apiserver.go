@@ -58,8 +58,14 @@ func ipHandler(w http.ResponseWriter, req *http.Request) {
 					switch v := a.(type) {
 					case *net.IPAddr:
 						infoLog.Printf("%v : %s (%s)\n", i.Name, v, v.IP.DefaultMask())
+						if i.Name != "lo" && i.Name[0:6] != "docker" {
+							l = append(l, fmt.Sprintf("%s", v.IP))
+						}
 					case *net.IPNet:
 						infoLog.Printf("%v : %s [%v/%v]\n", i.Name, v, v.IP, v.Mask)
+						if i.Name != "lo" && i.Name[0:6] != "docker" {
+							l = append(l, fmt.Sprintf("%s", v.IP))
+						}
 					}
 				}
 			}
@@ -71,7 +77,8 @@ func ipHandler(w http.ResponseWriter, req *http.Request) {
 	addrs, _ := net.LookupIP(host)
 	for _, addr := range addrs {
 		if ipv4 := addr.To4(); ipv4 != nil {
-			l = append(l, fmt.Sprintf("%s", ipv4))
+			//l = append(l, fmt.Sprintf("%s", ipv4))
+			infoLog.Printf("Hostname lookup: %s", ipv4)
 		}
 	}
 
