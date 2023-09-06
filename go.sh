@@ -12,6 +12,14 @@ storage_name="artemshtepa-devops16"
 sa_name="sa-diplom"
 # Дополнение к имени файла сервисного аккаунта
 sa_file="diplom"
+# Флаг отладки на локальных виртуальных машинах
+is_local_vm=true
+
+if [ "$is_local_vm" = true ]; then
+  vm_list_cmd="cat secrets/yc_local"
+else
+  vm_list_cmd="yc compute instance list --format json"
+fi
 
 if ! [ -x "$(command -v ansible)" ]; then
   echo "Ansible not found. Use init command" >&2
@@ -96,14 +104,15 @@ init() {
 
 clean() {
   cd $init_dir
-  rm ansible/playbook/files/_*
-  rm -r tf/terraform*
-  rm -r tf/.terraform
-  rm -r tf/.terraform.*
+  echo "Remove temporary files..."
+  rm ansible/playbook/files/_* 2>/dev/null
+  rm -r tf/terraform* 2>/dev/null
+  rm -r tf/.terraform 2>/dev/null
+  rm -r tf/.terraform.* 2>/dev/null
   echo "Destroy S3 storage..."
-  yc storage bucket delete --name $storage_name
+  yc storage bucket delete --name $storage_name 2>/dev/null
   echo "Delete service account..."
-  yc iam service-account delete --name $sa_name
+  yc iam service-account delete --name $sa_name 2>/dev/null
 }
 
 check_bastion() {
@@ -111,12 +120,13 @@ check_bastion() {
   export TF_WORKSPACE=$(terraform workspace show)
   echo "Use terraform workspace: $TF_WORKSPACE"
   cd $init_dir
-  export BASTION_IP=$(yc compute instance list --format json | jq -r '.[] | select(.name == "'$TF_WORKSPACE'-bastion") | .network_interfaces[].primary_v4_address.one_to_one_nat.address')
+  export BASTION_IP=$($vm_list_cmd | jq -r '.[] | select(.name == "'$TF_WORKSPACE'-bastion") | .network_interfaces[].primary_v4_address.one_to_one_nat.address')
+  export BASTION_USER=$($vm_list_cmd | jq -r '.[] | select(.name == "'$TF_WORKSPACE'-bastion") | .boot_disk.device_name')
   if [ -z "$BASTION_IP" ]; then
     echo "SSH Bastion does not exist or is not configured as NAT"
     exit 1
   else
-    echo "Use SSH Bastion at $BASTION_IP";
+    echo "Use SSH Bastion at $BASTION_USER:$BASTION_IP";
   fi
 }
 
@@ -227,16 +237,16 @@ run_vm() {
     yc compute instance list
   else
     if [ "$1" == "bastion" ]; then
-      ssh ubuntu@$BASTION_IP -i secrets/key_bastion
+      ssh $BASTION_USER@$BASTION_IP -i secrets/key_bastion
     else
       cmd=${@:2}
-      ip=$(yc compute instance list --format json | jq -r '.[] | select(.name == "'$TF_WORKSPACE'-'$1'") | .network_interfaces[0].primary_v4_address.address')
+      ip=$($vm_list_cmd | jq -r '.[] | select(.name == "'$TF_WORKSPACE'-'$1'") | .network_interfaces[0].primary_v4_address.address')
       if [ "$ip" == "" ]; then
         echo "Host name '$1' not exists"
-      elif [[ $ip == "kube*" ]]; then
-        ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion ubuntu@$BASTION_IP" debian@$ip -i secrets/key_kube $cmd
+      elif [[ $1 =~ [kube*] ]]; then
+        ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion $BASTION_USER@$BASTION_IP" debian@$ip -i secrets/key_kube $cmd
       else
-        ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion ubuntu@$BASTION_IP" debian@$ip -i secrets/key_machine $cmd
+        ssh -o ProxyCommand="ssh -W %h:%p -q -i secrets/key_bastion $BASTION_USER@$BASTION_IP" debian@$ip -i secrets/key_machine $cmd
       fi
     fi
   fi

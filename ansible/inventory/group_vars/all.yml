@@ -1,7 +1,7 @@
 ---
 bastion_host: "{{ lookup('ansible.builtin.env', 'BASTION_IP') }}"
 bastion_port: 22
-bastion_user: "ubuntu"
+bastion_user: "{{ lookup('ansible.builtin.env', 'BASTION_USER') }}"
 bastion_key: "../secrets/key_bastion"
 machine_key: "../secrets/key_machine"
 kube_key: "../secrets/key_kube"
