@@ -1,6 +1,7 @@
 - name: Wait for SSH Bastion ready
   gather_facts: false
   hosts: bastion
+  tags: bastion
   tasks:
     - name: Check fingerprint existance
       ansible.builtin.command: "ssh-keygen -F {{ bastion_host }}"

@@ -183,7 +183,7 @@ run_playbook() {
 i_sudo() {
   check_bastion
   cd $ansible_dir
-  ansible-playbook -i inventory playbook/bootstrap_vm.yml --tags sudo
+  ansible-playbook -i inventory playbook/bootstrap_hosts.yml --tags sudo
 }
 
 i_podman() {
@@ -253,16 +253,17 @@ run_vm() {
 }
 
 rearm() {
-  c=0
-  for n in $(yc compute instance list --format json | jq -r '.[] | select(.status != "RUNNING") | .name'); do
+  for n in $($vm_list_cmd | jq -r '.[] | select(.status != "RUNNING") | .name'); do
     echo "Rearm instance: $n ..."
-    yc compute instance start $n
-    ((c++))
+    if ! [ "$is_local_vm" = true ]; then
+      yc compute instance start $n
+    fi
+    if [[ $n =~ [*bastion] ]]; then
+      check_bastion
+      cd $ansible_dir
+      ansible-playbook -i inventory --tags bastion playbook/ssh_add_fp.yml
+    fi
   done
-  if [[ $c == 0 ]]; then
-    run_playbook true ssh_add_fp.yml
-  fi
-  echo $c
 }
 
 if [ $1 ]; then

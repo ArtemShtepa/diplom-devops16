@@ -1,18 +1,18 @@
 ---
-- name: Install prerequirements
+- name: Install GitLab Runner
   hosts: runner
   tasks:
-    - name: Create Gitlab Runner directories
+    - name: Create directories
       ansible.builtin.file:
         path: "{{ runner_home }}"
         state: directory
         owner: "{{ ansible_user }}"
         group: "{{ ansible_user }}"
-    - name: Check Gitlab Runner configuration file
+    - name: Check configuration file
       ansible.builtin.stat:
         path: "{{ runner_home }}/config.toml"
       register: cfg_res
-    - name: Generate Gitlab Runner configuration file
+    - name: Generate configuration file
       ansible.builtin.shell: >-
         podman run --rm
         --volume {{ runner_home }}:/etc/gitlab-runner
@@ -46,4 +46,15 @@
         name: podman-runner
         scope: user
         enabled: true
+
+- name: Update credentails for registry
+  hosts: runner
+  tags: registry
+  vars:
+    reg_cdt: "{{ lookup('file', '../../secrets/registry') | from_json }}"
+  tasks:
+    - name: Login in registry
+      ansible.builtin.command: "podman login {{ item.registry }} -u {{ item.user }} -p {{ item.password }}"
+      no_log: true
+      loop: "{{ reg_cdt }}"
 ...
