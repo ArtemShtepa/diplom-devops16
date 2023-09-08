@@ -195,7 +195,7 @@ i_gitlab() {
 }
 
 i_monitoring() {
-  run_playbook true install_influcdb.yml install_grafana.yml install_telegraf.yml
+  run_playbook true install_influxdb.yml install_grafana.yml install_telegraf.yml
 }
 
 i_grafana() {
@@ -275,19 +275,20 @@ else
   echo "  tf_plan      - Print Terraform plan"
   echo "  tf_apply     - Apply Terraform plan"
   echo "  tf_destroy   - Destroy Terraform plan"
+  echo "  i_sudo       - Configure hosts similarly to the YC instance (local VM)"
   echo "  i_update     - Update hosts package cache"
   echo "  i_bastion    - Configure SSH Bastion"
-  echo "  i_sudo       - Configure hosts similarly to the YC instance (local VM)"
   echo "  i_podman     - Install Podman"
-  echo "  i_gitlab     - Install GitLab CE"
-  echo "  i_monitoring - Install InfluxDB + Grafana + Telegraf"
-  echo "    i_grafana  - Install Grafana"
-  echo "    i_influxdb - Install InfluxDB"
-  echo "    i_telegraf - Install Telegraf"
+  echo "  i_gitlab     - Install GitLab CE *"
+  echo "  i_monitoring - Install InfluxDB + Grafana + Telegraf *"
+  echo "    i_grafana  - Install Grafana *"
+  echo "    i_influxdb - Install InfluxDB *"
+  echo "    i_telegraf - Install Telegraf *"
   echo "  i_runner     - Install GitLab Runner"
   echo "  i_kube_pre   - Install Kubernetes Prerequirements"
   echo "  i_kube_cl    - Install Kubernetes Cluster"
   echo "  run_vm       - Run SSH session or command on remote machine"
   echo "  rearm        - Start stopped YC instances"
   echo "  clean        - Destroy preconfigured YC resources and clear temporary files"
+  echo "                 * Steps require podman installed"
 fi
