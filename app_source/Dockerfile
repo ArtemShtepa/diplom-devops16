@@ -1,11 +1,8 @@
 FROM docker.io/golang:alpine AS compile-image
-WORKDIR /usr/src
-COPY go.mod apiserver.go ./
-RUN go build apiserver.go
+WORKDIR /src
+ADD apiserver.go __version__ ./
+RUN go mod init apiserver && go mod tidy && go build -ldflags="-X 'main.Version=$(cat __version__)'"
 
-#FROM docker.io/alpine
-FROM docker.io/debian:12
-#WORKDIR /
-COPY --from=compile-image /usr/src/apiserver /apiserver
-RUN chmod +x /apiserver
+FROM docker.io/alpine
+COPY --from=compile-image /src/apiserver /apiserver
 ENTRYPOINT ["/apiserver"]

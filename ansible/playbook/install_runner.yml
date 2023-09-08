@@ -57,4 +57,9 @@
       ansible.builtin.command: "podman login {{ item.registry }} -u {{ item.user }} -p {{ item.password }}"
       no_log: true
       loop: "{{ reg_cdt }}"
+    - name: Create registry link file
+      become: true
+      ansible.builtin.template:
+        src: "registry_list.jinja2"
+        dest: "/etc/registry_list"
 ...

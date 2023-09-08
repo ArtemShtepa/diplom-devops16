@@ -12,21 +12,27 @@ import (
 	"time"
 	"flag"
 	"math/rand"
+	"golang.org/x/exp/slices"
+	"github.com/google/uuid"
 )
 
 var (
-	infoLog   *log.Logger
-	errLog    *log.Logger
+	infoLog      *log.Logger
+	errLog       *log.Logger
+	Instance_id   string
+	Version = "Unknown"
 )
 
 func init() {
 	infoLog = log.New(os.Stdout, "INFO\t", log.Ldate|log.Ltime)
 	errLog = log.New(os.Stderr, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
+	Instance_id = uuid.New().String()
 }
 
 func renderJSON(w http.ResponseWriter, v interface{}) {
 	js, err := json.Marshal(v)
 	if err != nil {
+		errLog.Printf("Can't encode JSON block: %s", err.Error())
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -46,6 +52,19 @@ func rootHandler(w http.ResponseWriter, req *http.Request) {
 	renderJSON(w, m)
 }
 
+func uuidHandler(w http.ResponseWriter, req *http.Request) {
+	type Message struct {
+		Version string
+		Uuid string `json:"UUId"`
+	}
+	var m Message
+
+	m.Version = Version
+	m.Uuid = Instance_id
+
+	renderJSON(w, m)
+}
+
 func ipHandler(w http.ResponseWriter, req *http.Request) {
 	l := []string{}
 
@@ -58,28 +77,41 @@ func ipHandler(w http.ResponseWriter, req *http.Request) {
 					switch v := a.(type) {
 					case *net.IPAddr:
 						infoLog.Printf("%v : %s (%s)\n", i.Name, v, v.IP.DefaultMask())
-						if i.Name != "lo" && i.Name[0:6] != "docker" {
+						if i.Name != "lo" {
 							l = append(l, fmt.Sprintf("%s", v.IP))
 						}
 					case *net.IPNet:
 						infoLog.Printf("%v : %s [%v/%v]\n", i.Name, v, v.IP, v.Mask)
-						if i.Name != "lo" && i.Name[0:6] != "docker" {
+						if i.Name != "lo" {
 							l = append(l, fmt.Sprintf("%s", v.IP))
 						}
 					}
 				}
+			} else {
+				errLog.Printf("Decode interface address: %s", err.Error())
 			}
 		}
 	} else {
-		infoLog.Println("Can`t acquire network interfaces: ", err.Error())
+		errLog.Printf("Acquire network interfaces: %s", err.Error())
 	}
-	host, _ := os.Hostname()
-	addrs, _ := net.LookupIP(host)
-	for _, addr := range addrs {
-		if ipv4 := addr.To4(); ipv4 != nil {
-			//l = append(l, fmt.Sprintf("%s", ipv4))
-			infoLog.Printf("Hostname lookup: %s", ipv4)
+	host, err := os.Hostname()
+	if err == nil {
+		addrs, err := net.LookupIP(host)
+		if err == nil {
+			for _, addr := range addrs {
+				if ipv4 := addr.To4(); ipv4 != nil {
+					p := fmt.Sprintf("%s", ipv4)
+					infoLog.Printf("Hostname lookup: %s", p)
+					if ! slices.Contains(l, p) {
+						l = append(l, fmt.Sprintf("%s", ipv4))
+					}
+				}
+			}
+		} else {
+			errLog.Printf("Lookup IP from hostname: %s", err.Error())
 		}
+	} else {
+		errLog.Printf("Acquire hostname: %s", err.Error())
 	}
 
 	renderJSON(w, l)
@@ -109,44 +141,49 @@ func waitHandler(w http.ResponseWriter, req *http.Request) {
 }
 
 func taskHandler(w http.ResponseWriter, req *http.Request) {
+	type Message struct {
+		Id int `json:"id"`
+	}
+	var m Message
 	if req.URL.Path == "/task/" {
-		// Request is plain "/task/", without trailing ID.
-		if req.Method == http.MethodPost {
-
-		} else if req.Method == http.MethodGet {
-
-		} else if req.Method == http.MethodDelete {
+		if req.Method == http.MethodPost || req.Method == http.MethodGet {
 
 		} else {
-			http.Error(w, fmt.Sprintf("expect method GET, DELETE or POST at /task/, got %v", req.Method), http.StatusMethodNotAllowed)
+			errLog.Printf("Request method: %s", req.Method)
+			http.Error(w, fmt.Sprintf("Expect method GET or POST at /task/, got %v", req.Method), http.StatusMethodNotAllowed)
 			return
 		}
 	} else {
-		// Request has an ID, as in "/task/<id>".
 		path := strings.Trim(req.URL.Path, "/")
 		pathParts := strings.Split(path, "/")
 		if len(pathParts) < 2 {
-			http.Error(w, "expect /task/<id> in task handler", http.StatusBadRequest)
+			errLog.Printf("Path length in request: %v", len(pathParts))
+			http.Error(w, "Expect /task/<id> in task handler", http.StatusBadRequest)
 			return
-		}
-		id, err := strconv.Atoi(pathParts[1])
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		infoLog.Println(id)
-
-		if req.Method == http.MethodDelete {
-
-		} else if req.Method == http.MethodGet {
-
 		} else {
-			http.Error(w, fmt.Sprintf("expect method GET or DELETE at /task/<id>, got %v", req.Method), http.StatusMethodNotAllowed)
-			return
+			id, err := strconv.Atoi(pathParts[1])
+			if err != nil {
+				errLog.Printf("Decode task id: %s, %s", pathParts[1], err.Error())
+				http.Error(w, fmt.Sprintf("Expect numeric task id: %s", err.Error()), http.StatusBadRequest)
+				return
+			} else {
+				m.Id = id
+				infoLog.Printf("Accept task id: %v", m.Id)
+				if req.Method == http.MethodGet {
+
+				} else if req.Method == http.MethodPost {
+
+				} else if req.Method == http.MethodDelete {
+
+				} else {
+					errLog.Printf("Request method: %s", req.Method)
+					http.Error(w, fmt.Sprintf("Expect method GET, POST or DELETE at /task/<id>, got %v", req.Method), http.StatusMethodNotAllowed)
+					return
+				}
+			}
 		}
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte(`{"response":"ok"}`))
+	renderJSON(w, m)
 }
 
 func main() {
@@ -161,9 +198,10 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", rootHandler)
+	mux.HandleFunc("/uuid", uuidHandler)
 	mux.HandleFunc("/ip", ipHandler)
 	mux.HandleFunc("/task/", taskHandler)
-	mux.HandleFunc("/wait/", waitHandler)
+	mux.HandleFunc("/wait", waitHandler)
 
 	errLog.Fatal(http.ListenAndServe(*addr, mux))
 }
