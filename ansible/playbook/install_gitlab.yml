@@ -17,13 +17,6 @@
       ansible.builtin.template:
         src: "gitlab.rb.jinja2"
         dest: "{{ gitlab_home }}/config/gitlab.rb"
-    - name: Copy GitLab secrets file
-      ansible.builtin.copy:
-        src: "gitlab-secrets.json"
-        dest: "{{ gitlab_home }}/config/gitlab-secrets.json"
-      when:
-        - gitlab_backup is defined
-        - gitlab_backup != ""
     - name: Run Gitlab container
       containers.podman.podman_container:
         name: gitlab
@@ -50,43 +43,10 @@
       loop:
         - "data/backups"
         - "data/git-data"
-    - block:
-      - name: Get permission of backups
-        ansible.builtin.stat:
-          path: "{{ gitlab_home }}/data/git-data"
-        register: bp
-      - name: Copy GitLab backup file
-        become: true
-        ansible.builtin.copy:
-          src: "{{ gitlab_backup }}"
-          dest: "{{ gitlab_home }}/data/backups/latest_gitlab_backup.tar"
-          owner: "{{ bp.stat.uid }}"
-          group: "{{ bp.stat.gid }}"
-      - name: Stop internal gitlab services
-        ansible.builtin.command: "podman exec -ti gitlab gitlab-ctl stop {{ item }}"
-        loop:
-          - "puma"
-          - "sidekiq"
-        register: cmd_res
-        changed_when: false
-      - name: Restore GitLab backup
-        ansible.builtin.command: "podman exec -ti gitlab gitlab-backup restore BACKUP=latest force=yes"
-        register: cmd_res
-        retries: 5
-        delay: 60
-        until: cmd_res.rc == 0
-        changed_when: false
-      - name: Restart Gitlab container
-        containers.podman.podman_container:
-          name: gitlab
-          state: started
-          force_restart: true
-      when:
-        - gitlab_backup is defined
-        - gitlab_backup != ""
+
     - block:
       - name: Get initial password
-        ansible.builtin.command: "cat {{ gitlab_home }}/config/initial_root_password"
+        ansible.builtin.shell: "cat {{ gitlab_home }}/config/initial_root_password | grep Password:"
         ignore_errors: true
         changed_when: false
         register: cmd_res
@@ -95,9 +55,20 @@
           var: cmd_res.stdout
         when: cmd_res.rc == 0
       when: gitlab_backup is undefined or gitlab_backup == ""
+
     - name: Run as service
       ansible.builtin.systemd:
         name: podman-gitlab
         scope: user
         enabled: true
+# Запуск playbook восстановление бэкапа если есть файл архива
+    - name: Check backup file exists
+      ansible.builtin.file:
+        path: "files/{{ gitlab_backup }}"
+        state: file
+      delegate_to: localhost
+      register: f_name
+- name: Restore backup
+  ansible.builtin.import_playbook: backup_restore.yml
+  when: f_name.state == "file"
 ...

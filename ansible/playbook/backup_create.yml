@@ -1,0 +1,53 @@
+---
+- name: Create GitLab backup
+  hosts: gitlab
+  become: true
+  vars:
+    backup_filepath: "/home/{{ ansible_user }}/{{ gitlab_backup }}"
+  tasks:
+    - block:
+      - name: Create backup with custom file name
+        become: false
+        ansible.builtin.command: "podman exec -t gitlab gitlab-backup create BACKUP={{ gitlab_backup_custom }}"
+      - name: Find archive name
+        ansible.builtin.find:
+          paths: "{{ gitlab_home }}/data/backups"
+          patterns: "{{ gitlab_backup_custom }}*_gitlab_backup.tar"
+        register: f_name
+      when:
+        - gitlab_backup_custom is defined
+        - gitlab_backup_custom != ""
+    - block:
+      - name: Create backup with standard file name
+        become: false
+        ansible.builtin.command: "podman exec -t gitlab gitlab-backup create"
+      - name: Find archive name
+        ansible.builtin.find:
+          paths: "{{ gitlab_home }}/data/backups"
+          patterns: "*_{{ gitlab_version }}_gitlab_backup.tar"
+        register: f_name
+      when: gitlab_backup_custom is undefined or gitlab_backup_custom == ""
+    - block:
+      - name: Pack files in one archive
+        ansible.builtin.archive:
+          format: tar
+          path:
+            - "{{ f_name.files[0].path }}"
+            - "{{ gitlab_home }}/config/gitlab.rb"
+            - "{{ gitlab_home }}/config/gitlab-secrets.json"
+          dest: "{{ backup_filepath }}"
+      - name: Transfer backup to local machine
+        ansible.builtin.fetch:
+          src: "{{ backup_filepath }}"
+          dest: "files/"
+          flat: true
+      - name: Delete backup from GitLab direcoty and temporary files
+        become: false
+        ansible.builtin.file:
+          path: "{{ item }}"
+          state: absent
+        loop:
+          - "{{ f_name.files[0].path }}"
+          - "{{ backup_filepath }}"
+      when: f_name.files | length > 0
+...

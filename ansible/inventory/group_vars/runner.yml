@@ -1,7 +1,7 @@
 ---
-runner_version: "alpine-v16.0.1"
+runner_version: "alpine-v16.3.0"
 runner_home: "/home/{{ ansible_user }}/gitlab-runner"
 runner_port: 8093
-runner_token: "glrt-ZQq_pN8fsa_BfDkw-B44"
-runner_image: "golang:1.20.4-alpine"
+runner_token: "glrt-UvatnYKiKq_rc92Kczv7"
+runner_image: "golang:1.21.1-alpine"
 ...

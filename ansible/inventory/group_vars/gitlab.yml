@@ -2,5 +2,6 @@
 gitlab_version: "16.3.2"
 gitlab_home: "/home/{{ ansible_user }}/gitlab"
 gitlab_port: "8081"
-#gitlab_backup: "_gitlab_{{ gitlab_version }}_backup.tar"
+gitlab_backup: "_gitlab_{{ gitlab_version }}_backup.tar"
+#gitlab_backup_custom: "temp"
 ...
