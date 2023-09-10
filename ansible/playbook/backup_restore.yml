@@ -59,6 +59,10 @@
           name: gitlab
           state: started
           force_restart: true
+        register: rst_res
+        retries: 10
+        delay: 6
+        until: rst_res.changed
       # Удаление файлов из каталога резервныз копий GitLab
       - name: Empty GitLab backup directory
         become: true

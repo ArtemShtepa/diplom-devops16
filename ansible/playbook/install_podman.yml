@@ -1,17 +1,28 @@
 ---
-- name: Install podman package
+- name: Install podman
   hosts: podman
   become: true
   tasks:
-    - name: Install podman and other packages
+    - name: Install other packages
       ansible.builtin.package:
         name: "{{ item }}"
         state: present
       loop:
-        - podman
         - curl
         - htop
+    - name: Install podman package
+      ansible.builtin.package:
+        name: podman
+        state: present
+      register: ins_res
     - name: Enable Podman executing without login
-      ansible.builtin.command: "loginctl enable-linger {{ ansible_user_uid }}"
+      ansible.builtin.command: "loginctl enable-linger {{ ansible_user }}"
       changed_when: false
+    - name: Reboot machine
+      ansible.builtin.reboot:
+        post_reboot_delay: 20
+        reboot_timeout: 120
+        connect_timeout: 180
+        test_command: uptime
+      when: ins_res.changed
 ...

@@ -68,6 +68,15 @@
         state: file
       delegate_to: localhost
       register: f_name
+    - name: Wait until GitLab is ready
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ gitlab_port }}/"
+        follow_redirects: safe
+      register: url_res
+      retries: 30
+      delay: 10
+      until: url_res.status == 200
+      when: f_name.state == "file"
 - name: Restore backup
   ansible.builtin.import_playbook: backup_restore.yml
   when: f_name.state == "file"

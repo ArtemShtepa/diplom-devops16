@@ -37,7 +37,17 @@
             #- /proc:/hostfs/proc:ro
             #- /etc:/hostfs/etc:ro
             - "/:/hostfs:ro"
-        #network: host
+        network: host
+    - name: Restart Telegraf container
+      containers.podman.podman_container:
+        name: telegraf
+        state: started
+        force_restart: true
+      register: rst_res
+      retries: 10
+      delay: 6
+      until: rst_res.changed
+      when: cnf_res.changed
     - name: Run as service
       ansible.builtin.systemd:
         name: podman-telegraf

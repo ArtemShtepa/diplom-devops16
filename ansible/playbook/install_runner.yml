@@ -29,8 +29,8 @@
         name: runner
         image: "docker.io/gitlab/gitlab-runner:{{ runner_version }}"
         state: started
+        recreate: "{{ not cfg_res.stat.exists }}"
         restart_policy: "always"
-        recreate: yes
         generate_systemd:
           container_prefix: "podman"
           path: "~/.config/systemd/user/"
