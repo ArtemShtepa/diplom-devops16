@@ -33,6 +33,11 @@ frontend gitlab
   tcp-request inspect-delay 5s
   default_backend gitlab-ep
 
+frontend gitlab-ssh
+  bind *:8001
+  mode tcp
+  default_backend gitlab-ssh
+
 frontend influxdb
   bind *:8010
   tcp-request inspect-delay 5s
@@ -56,6 +61,10 @@ listen proxy_stats
 
 backend gitlab-ep
   server gitlab-web {{ hostvars[groups.gitlab | random].ansible_host }}:{{ hostvars[groups.gitlab | random].gitlab_port }}
+
+backend gitlab-ssh
+  mode tcp
+  server gitlab-git {{ hostvars[groups.gitlab | random].ansible_host }}:{{ hostvars[groups.gitlab | random].gitlab_ssh_port }} check
 
 backend influxdb-ep
   server influxdb-web {{ hostvars[groups.influxdb | random].ansible_host }}:{{ hostvars[groups.influxdb | random].influxdb_port }}

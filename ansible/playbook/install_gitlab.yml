@@ -28,7 +28,7 @@
           path: "~/.config/systemd/user/"
           restart_policy: "always"
         publish:
-          - "22048:22"
+          - "{{ gitlab_ssh_port }}:22"
           - "{{ gitlab_port }}:8081"
         volume:
           - "{{ gitlab_home }}/data:/var/opt/gitlab"
