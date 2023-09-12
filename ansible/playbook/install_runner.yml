@@ -1,6 +1,83 @@
 ---
-- name: Install GitLab Runner
+- name: Install GitLab Runner AS shell executor
   hosts: runner
+  vars:
+    repo_script: "{{ runner_home }}/repo-install.sh"
+  tasks:
+    - name: Create directories
+      ansible.builtin.file:
+        path: "{{ runner_home }}"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+    - name: Check repo installation script
+      ansible.builtin.file:
+        path: "{{ repo_script }}"
+        state: "file"
+      register: rep_rest
+      ignore_errors: true
+    - block:
+      - block:
+        - name: Download installation script for DEB
+          ansible.builtin.get_url:
+            url: https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.deb.sh
+            dest: "{{ repo_script }}"
+        - name: Apply APT pinning
+          become: true
+          ansible.builtin.copy:
+            dest: "/etc/apt/preferences.d/pin-gitlab-runner.pref"
+            content: |
+              Explanation: Prefer GitLab provided packages over the Debian native ones
+              Package: gitlab-runner
+              Pin: origin packages.gitlab.com
+              Pin-Priority: 1001
+        when: ansible_pkg_mgr == "apt"
+      - name: Download installation script for RPM
+        ansible.builtin.get_url:
+          url: https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.rpm.sh
+          dest: "{{ repo_script }}"
+        when: ansible_pkg_mgr == "yum" or ansible_pkg_mgr == "dnf"
+      - name: Add GitLab repositories
+        become: true
+        ansible.builtin.command: "bash {{ runner_home }}/repo-install.sh"
+      when: rep_rest.state == "absent"
+    - name: Install Runner package
+      become: true
+      ansible.builtin.package:
+        name: gitlab-runner
+        state: present
+        update_cache: true
+    - name: Get list of registered runners
+      become: true
+      ansible.builtin.shell: "gitlab-runner list"
+      changed_when: false
+      ignore_errors: true
+      register: r_res
+    - name: Check shell runner existance
+      ansible.builtin.set_fact:
+        runner_list: "{{ r_res.stderr_lines | select('search', runner_name) }}"
+    - block:
+      - name: Configure UIDs for gitlab-runner
+        become: true
+        ansible.builtin.command: "usermod --add-subuids 10000-65535 gitlab-runner"
+      - name: Configure GIDs for gitlab-runner
+        become: true
+        ansible.builtin.command: "usermod --add-subgids 10000-65535 gitlab-runner"
+      - name: Register shell runner
+        become: true
+        ansible.builtin.command:
+          gitlab-runner register
+          --non-interactive
+          --name "{{ runner_name }}"
+          --url "http://{{ bastion_host }}:8000"
+          --token "{{ runner_token }}"
+          --executor "shell"
+      when: runner_list | length == 0
+
+- name: Install GitLab Runner AS docker executor
+  hosts: runner
+  tags:
+    - never
   tasks:
     - name: Create directories
       ansible.builtin.file:
@@ -21,15 +98,16 @@
         --url "http://{{ bastion_host }}:8000"
         --token "{{ runner_token }}"
         --executor "docker"
+        --docker-privileged=true
         --docker-image "{{ runner_image }}"
         --description "Builder for GoLang applications for linux"
       when: not cfg_res.stat.exists
     - name: Run Gitlab Runner container
       containers.podman.podman_container:
-        name: runner
+        name: runner-docker
         image: "docker.io/gitlab/gitlab-runner:{{ runner_version }}"
         state: started
-        recreate: "{{ not cfg_res.stat.exists }}"
+        recreate: "{{ not cfg_res.stat.exists or cfg_res.changed }}"
         restart_policy: "always"
         generate_systemd:
           container_prefix: "podman"
@@ -39,8 +117,8 @@
           - "{{ runner_port }}:8093"
         volume:
           - "{{ runner_home }}:/etc/gitlab-runner"
-          #- "/run/user/{{ ansible_user_uid }}/podman/podman.sock:/var/run/docker.sock"
-          - "/run/podman/podman.sock:/var/run/docker.sock"
+          - "/run/user/{{ ansible_user_uid }}/podman/podman.sock:/var/run/docker.sock"
+          #- "/run/podman/podman.sock:/var/run/docker.sock"
     - name: Run as service
       ansible.builtin.systemd:
         name: podman-runner

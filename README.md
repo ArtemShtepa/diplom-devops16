@@ -165,6 +165,9 @@
 1. Зеркало дистрибутивов [Terraform](https://hashicorp-releases.yandexcloud.net/terraform/)
 1. Документация по языку [Terraform](https://developer.hashicorp.com/terraform/language)
 
+### Документация GitLab
+1. Ключевые слова [CI/CD](https://docs.gitlab.com/16.3/ee/ci/yaml/)
+
 ### Документация Kubernetes и связанного с ним
 1. Установка [kubeadm](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/)
 1. [Отказоустойчивый кластер](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/high-availability/)
