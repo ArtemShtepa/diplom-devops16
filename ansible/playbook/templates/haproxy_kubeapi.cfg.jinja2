@@ -29,7 +29,7 @@ frontend apiserver
 listen stats
   bind *:80
   stats enable
-  stats uri /kubeapi_stats
+  stats uri /
   stats auth root:haproxy
 
 backend apiserver

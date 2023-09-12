@@ -7,6 +7,7 @@
         path: "files/{{ gitlab_backup }}"
         state: file
       delegate_to: localhost
+      ignore_errors: true
       register: f_name
     - block:
       #- name: Copy GitLab secrets file

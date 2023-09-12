@@ -29,34 +29,34 @@ defaults
   retries 33
 
 frontend gitlab
-  bind *:8000
+  bind *:{{ bastion_gitlab }}
   tcp-request inspect-delay 5s
   default_backend gitlab-ep
 
 frontend gitlab-ssh
-  bind *:8001
+  bind *:{{ bastion_git }}
   mode tcp
   default_backend gitlab-ssh
 
 frontend influxdb
-  bind *:8010
+  bind *:{{ bastion_influxdb }}
   tcp-request inspect-delay 5s
   default_backend influxdb-ep
 
 frontend grafana
-  bind *:8011
+  bind *:{{ bastion_grafana }}
   tcp-request inspect-delay 5s
   default_backend grafana-ep
 
 frontend kubeapi_stats
-  bind *:8021
+  bind *:{{ bastion_haproxy_kube }}
   tcp-request inspect-delay 5s
   default_backend kubeapi-ep
 
 listen proxy_stats
-  bind *:8020
+  bind *:{{ bastion_haproxy_main }}
   stats enable
-  stats uri /proxy_stats
+  stats uri /
   stats auth root:haproxy
 
 backend gitlab-ep

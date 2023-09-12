@@ -2,6 +2,12 @@
 bastion_host: "{{ lookup('ansible.builtin.env', 'BASTION_IP') }}"
 bastion_port: 22
 bastion_user: "{{ lookup('ansible.builtin.env', 'BASTION_USER') }}"
+bastion_gitlab: 8000
+bastion_git: 8001
+bastion_influxdb: 8010
+bastion_grafana: 8011
+bastion_haproxy_main: 8020
+bastion_haproxy_kube: 8021
 bastion_key: "../secrets/key_bastion"
 machine_key: "../secrets/key_machine"
 kube_key: "../secrets/key_kube"

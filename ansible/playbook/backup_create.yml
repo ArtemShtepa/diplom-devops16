@@ -42,7 +42,6 @@
           dest: "files/"
           flat: true
       - name: Delete backup from GitLab direcoty and temporary files
-        become: false
         ansible.builtin.file:
           path: "{{ item }}"
           state: absent

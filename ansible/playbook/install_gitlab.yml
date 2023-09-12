@@ -43,7 +43,21 @@
       loop:
         - "data/backups"
         - "data/git-data"
-
+# Запуск GitLab в качестве сервиса
+    - name: Run as service
+      ansible.builtin.systemd:
+        name: podman-gitlab
+        scope: user
+        enabled: true
+# Определение существования резервной копии GitLab
+    - name: Determining need for GitLab readiness
+      ansible.builtin.file:
+        path: "files/{{ gitlab_backup }}"
+        state: file
+      delegate_to: localhost
+      ignore_errors: true
+      register: f_name
+# Блок вывода пароля администратора при инициализации GitLab
     - block:
       - name: Get initial password
         ansible.builtin.shell: "cat {{ gitlab_home }}/config/initial_root_password | grep Password:"
@@ -52,22 +66,10 @@
         register: cmd_res
       - name: Print root password
         ansible.builtin.debug:
-          var: cmd_res.stdout
+          msg: "{{ cmd_res.stdout }}"
         when: cmd_res.rc == 0
-      when: gitlab_backup is undefined or gitlab_backup == ""
-
-    - name: Run as service
-      ansible.builtin.systemd:
-        name: podman-gitlab
-        scope: user
-        enabled: true
-# Запуск playbook восстановление бэкапа если есть файл архива
-    - name: Check backup file exists
-      ansible.builtin.file:
-        path: "files/{{ gitlab_backup }}"
-        state: file
-      delegate_to: localhost
-      register: f_name
+      when: gitlab_backup is undefined or gitlab_backup == "" or f_name.state == "absent"
+# Ожидание готовности GitLab если будет запущено восстановление из резервной копии
     - name: Wait until GitLab is ready
       ansible.builtin.uri:
         url: "http://127.0.0.1:{{ gitlab_port }}/"
@@ -79,5 +81,4 @@
       when: f_name.state == "file"
 - name: Restore backup
   ansible.builtin.import_playbook: backup_restore.yml
-  when: f_name.state == "file"
 ...
