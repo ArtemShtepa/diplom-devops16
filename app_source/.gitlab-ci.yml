@@ -1,0 +1,60 @@
+stages:
+  - compile
+  - build
+  - deploy
+
+variables:
+  #DFILE: "full"
+  DFILE: "art"
+
+Compile:
+  stage: compile
+  #only:
+  #  changes:
+  #    - "**/*.go"
+  #variables:
+  #  DFILE: "art"
+  tags:
+    - linux
+    - podman
+  script:
+    - git describe --always --tags > __version__
+    - podman run --rm -v ./src:/src docker.io/golang:alpine sh -c "cd /src && go mod init apiserver && go mod tidy && go build -ldflags=\"-X 'main.Version=$(cat __version__)'\""
+  artifacts:
+    paths:
+      - src/apiserver
+
+Build image:
+  stage: build
+  when: on_success
+  dependencies:
+    - Compile
+  tags:
+    - podman
+  script:
+    - git describe --always --tags > __version__
+    - bash build.sh --build-$DFILE
+
+Push image:
+  stage: build
+  when: manual
+  needs:
+    - Build image
+  only:
+    - tags
+  tags: ['podman']
+  script:
+    - echo $CI_COMMIT_TAG > __version__
+    - bash build.sh --push
+
+Deploy:
+  stage: deploy
+  needs:
+    - Push image
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^[0-9]+\.[0-9]+$/
+      when: manual
+  tags: ['podman']
+  script:
+    - echo "Deploying application v$CI_COMMIT_TAG..."
+    - echo "Application successfully deployed."

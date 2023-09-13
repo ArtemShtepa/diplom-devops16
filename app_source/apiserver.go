@@ -194,6 +194,8 @@ func main() {
 	addr := flag.String("addr", addr_def, "Address on which server will listen for requests")
 	flag.Parse()
 
+	infoLog.Println("Version:", Version)
+	infoLog.Println("UUID:", Instance_id)
 	infoLog.Println("Listen on", *addr)
 
 	mux := http.NewServeMux()

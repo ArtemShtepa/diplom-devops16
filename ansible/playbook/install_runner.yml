@@ -1,15 +1,21 @@
 ---
-- name: Install GitLab Runner AS shell executor
+- name: Create Runner directory
   hosts: runner
-  vars:
-    repo_script: "{{ runner_home }}/repo-install.sh"
+  gather_facts: false
   tasks:
-    - name: Create directories
+    - name: Create directory
       ansible.builtin.file:
         path: "{{ runner_home }}"
         state: directory
         owner: "{{ ansible_user }}"
         group: "{{ ansible_user }}"
+
+# Установка Runner прямо в систему и регистрация как SHELL
+- name: Install GitLab Runner AS shell executor
+  hosts: runner
+  vars:
+    repo_script: "{{ runner_home }}/repo-install.sh"
+  tasks:
     - name: Check repo installation script
       ansible.builtin.file:
         path: "{{ repo_script }}"
@@ -74,17 +80,12 @@
           --executor "shell"
       when: runner_list | length == 0
 
+# Установка Runner в виде контейнера podman и регистрация как DOCKER
 - name: Install GitLab Runner AS docker executor
   hosts: runner
   tags:
     - never
   tasks:
-    - name: Create directories
-      ansible.builtin.file:
-        path: "{{ runner_home }}"
-        state: directory
-        owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"
     - name: Check configuration file
       ansible.builtin.stat:
         path: "{{ runner_home }}/config.toml"
@@ -125,6 +126,7 @@
         scope: user
         enabled: true
 
+# Создание файла списка registry и обновление авторизации в них для агента podman
 - name: Update credentails for registry
   hosts: runner
   tags: registry
@@ -132,7 +134,7 @@
     reg_cdt: "{{ lookup('file', '../../secrets/registry') | from_json }}"
   tasks:
     - name: Login in registry
-      ansible.builtin.command: "podman login {{ item.registry }} -u {{ item.user }} -p {{ item.password }}"
+      ansible.builtin.command: "sudo -u gitlab-runner podman login {{ item.registry }} -u {{ item.user }} -p {{ item.password }}"
       no_log: true
       loop: "{{ reg_cdt }}"
     - name: Create registry link file

@@ -1,0 +1,3 @@
+FROM docker.io/alpine
+ADD /src/apiserver /apiserver
+ENTRYPOINT ["/apiserver"]
