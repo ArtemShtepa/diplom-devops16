@@ -35,7 +35,8 @@ C14='\e[1;33m'
 C15='\e[1;37m'
 
 if [ "$is_local_vm" = true ]; then
-  vm_list_cmd="cat secrets/yc_local"
+  vm_list_cmd="cat $init_dir/secrets/yc_local"
+  export VM_LIST_CMD=$vm_list_cmd
 else
   vm_list_cmd="yc compute instance list --format json"
 fi

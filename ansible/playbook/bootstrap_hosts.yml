@@ -2,13 +2,22 @@
 - name: Add kubernetes hosts
   ansible.builtin.import_playbook: dynamic_inv.yml
 
-- name: Update package cache
+- name: Bootstrap machines
   hosts: all
   tasks:
-    - name: Use universal module
+    - name: Update package cache with universal module
       become: true
       ansible.builtin.package:
         update_cache: true
+    - name: Update hosts file
+      become: true
+      ansible.builtin.blockinfile:
+        dest: /etc/hosts
+        block: |
+          {% for item in groups['all'] %}
+          {{ hostvars[item]['ansible_host'] }} {{ item }}
+          {% endfor %}
+        state: present
 
 - name: Install sudo package with root
   hosts: all
@@ -18,6 +27,9 @@
   vars:
     ansible_ssh_common_args: ""
   tasks:
+    - name: Update hostname from playbook
+      ansible.builtin.hostname:
+        name: "{{ inventory_hostname }}"
     - name: Save user name
       set_fact:
         remote_user: "{{ ansible_user }}"

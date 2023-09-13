@@ -4,9 +4,10 @@
   hosts: localhost
   vars:
     tf_workspace: "{{ lookup('ansible.builtin.env', 'TF_WORKSPACE') }}"
+    vm_list_cmd: "{{ lookup('ansible.builtin.env', 'VM_LIST_CMD', default='yc compute instance list --format json') }}"
   tasks:
     - name: Search kubernetes master instances
-      ansible.builtin.shell: "yc compute instance list --format json | jq '[ .[] | select(.name? | match(\"{{ tf_workspace }}-kube-master-*\")) ]'"
+      ansible.builtin.shell: "{{ vm_list_cmd }} | jq '[ .[] | select(.name? | match(\"{{ tf_workspace }}-kube-master-*\")) ]'"
       register: yc_instances
       failed_when: yc_instances.rc != 0
       changed_when: false
@@ -17,11 +18,11 @@
           - kube_master
         ansible_host: "{{ item['network_interfaces'][0]['primary_v4_address']['address'] }}"
         ansible_user: "{{ item['boot_disk']['device_name'] }}"
-        host: "{{ item['name'] }}"
+        host: "{{ item['name'][tf_workspace|length+1:] }}"
       loop: "{{ yc_instances.stdout | from_json }}"
       changed_when: false
     - name: Search kubernetes worker instances
-      ansible.builtin.shell: "yc compute instance list --format json | jq '[ .[] | select(.name? | match(\"{{ tf_workspace }}-kube-worker-*\")) ]'"
+      ansible.builtin.shell: "{{ vm_list_cmd }} | jq '[ .[] | select(.name? | match(\"{{ tf_workspace }}-kube-worker-*\")) ]'"
       register: yc_instances
       failed_when: yc_instances.rc != 0
       changed_when: false
@@ -32,7 +33,7 @@
           - kube_worker
         ansible_host: "{{ item['network_interfaces'][0]['primary_v4_address']['address'] }}"
         ansible_user: "{{ item['boot_disk']['device_name'] }}"
-        host: "{{ item['name'] }}"
+        host: "{{ item['name'][tf_workspace|length+1:] }}"
       loop: "{{ yc_instances.stdout | from_json }}"
       changed_when: false
 ...
