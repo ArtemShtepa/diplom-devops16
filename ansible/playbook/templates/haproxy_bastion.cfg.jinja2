@@ -60,17 +60,17 @@ listen proxy_stats
   stats auth root:haproxy
 
 backend gitlab-ep
-  server gitlab-web {{ hostvars[groups.gitlab | random].ansible_host }}:{{ hostvars[groups.gitlab | random].gitlab_port }}
+  server gitlab-web {{ hostvars[groups.gitlab | random].ansible_host }}:{{ hostvars[groups.gitlab | random].gitlab_port }} check
 
 backend gitlab-ssh
   mode tcp
   server gitlab-git {{ hostvars[groups.gitlab | random].ansible_host }}:{{ hostvars[groups.gitlab | random].gitlab_ssh_port }} check
 
 backend influxdb-ep
-  server influxdb-web {{ hostvars[groups.influxdb | random].ansible_host }}:{{ hostvars[groups.influxdb | random].influxdb_port }}
+  server influxdb-web {{ hostvars[groups.influxdb | random].ansible_host }}:{{ hostvars[groups.influxdb | random].influxdb_port }} check
 
 backend grafana-ep
-  server grafana-web {{ hostvars[groups.grafana | random].ansible_host }}:{{ hostvars[groups.grafana | random].grafana_port }}
+  server grafana-web {{ hostvars[groups.grafana | random].ansible_host }}:{{ hostvars[groups.grafana | random].grafana_port }} check
 
 backend kubeapi-ep
-  server kubeapi-web {{ hostvars[groups.kube_proxy.0].ansible_host }}:80
+  server kubeapi-web {{ hostvars[groups.kube_proxy.0].ansible_host }}:80 check

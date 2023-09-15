@@ -1,7 +1,6 @@
 ---
 kube_version: "1.27.4"
 kube_api_port: "6443"
-kube_api_proxy_port: "6443"
 kube_network_cidr: "192.168.100.0/24"
 kube_manifests:
   - "https://docs.projectcalico.org/manifests/calico.yaml"

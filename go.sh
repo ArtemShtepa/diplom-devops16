@@ -259,6 +259,10 @@ i_kube_cl() {
   run_playbook true install_kube-cluster.yml
 }
 
+i_kube_proxy() {
+  run_playbook true install_kube-finalize.yml
+}
+
 run_vm() {
   check_bastion
   if [ "$1" == "" ]; then
@@ -337,6 +341,8 @@ else
   echo -e "$C9  i_runner     $C7- Install GitLab Runner"
   echo -e "$C11  i_kube_pre   $C7- Install Kubernetes Prerequirements"
   echo -e "$C11  i_kube_cl    $C7- Install Kubernetes Cluster"
+  echo -e "$C11  i_kube_proxy $C7- Finalize Kubernetes Cluster installation"
+  echo -e "$C8                 ( Create cumulative Kubernetes config file )"
   echo -e "$C5  run_vm       $C7- Run SSH session or command on remote machine"
   echo -e "$C13  rearm        $C7- Start stopped YC instances"
   echo -e "$C12  clean        $C7- Destroy preconfigured YC resources and clear temporary files"

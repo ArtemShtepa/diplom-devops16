@@ -20,24 +20,28 @@ defaults
     timeout http-keep-alive 10s
     timeout check           10s
 
-frontend apiserver
-    bind *:{{ hostvars[groups.kube_nodes.0].kube_api_proxy_port }}
+{% for ws in hostvars[inventory_hostname].kube_api_proxy_port | list %}
+frontend apiserver-{{ ws }}
+    bind *:{{ hostvars[inventory_hostname].kube_api_proxy_port[ws] }}
     mode tcp
     option tcplog
-    default_backend apiserver
+    default_backend apiserver-{{ ws }}
+{% endfor %}
 
 listen stats
-  bind *:80
-  stats enable
-  stats uri /
-  stats auth root:haproxy
+    bind *:80
+    stats enable
+    stats uri /
+    stats auth root:haproxy
 
-backend apiserver
+{% for ws in hostvars[inventory_hostname].kube_api_proxy_port | list %}
+backend apiserver-{{ ws }}
     option httpchk GET /healthz
     http-check expect status 200
     mode tcp
     option ssl-hello-chk
     balance     roundrobin
 {% for item in groups['kube_master'] %}
-    server {{ item }} {{ hostvars[item].ansible_host }}:{{ hostvars[groups.kube_nodes.0].kube_api_port }} check
+    server {{ ws }}-{{ item }} {{ hostvars[item].ansible_host }}:{{ hostvars[groups.kube_nodes.0].kube_api_port }} check
+{% endfor %}
 {% endfor %}
