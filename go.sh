@@ -62,7 +62,7 @@ get_yc_vars() {
 }
 
 if ! [ -x "$(command -v yc)" ]; then
-  echo -e "$C12 Yandex CLI is not installed.$CR Use$C14 initC$R command" >&2
+  echo -e "$C12 Yandex CLI is not installed.$CR Use$C14 init$CR command" >&2
 else
   export TF_VAR_YC_SA_FILE=$(pwd)/$(ls secrets/sa_file*.json | head -n1)
   export TF_VAR_YC_SA_ID=$(cat $TF_VAR_YC_SA_FILE | jq -r .service_account_id)
@@ -115,7 +115,7 @@ init() {
   create_ssh_key machine
   # Создание бакета
   if ! $(yc storage bucket get $storage_name 1>/dev/null 2>&1); then
-    echo -e "$C10 Create S3 storage...C$8"
+    echo -e "$C10 Create S3 storage...$C8"
     if ! $(yc storage bucket create --name $storage_name 1>/dev/null 2>&1); then
       echo -e "$C12 FAIL! Can't create bucket. May be name is already used?$CR"
       exit
@@ -332,8 +332,8 @@ else
   echo -e "$C15  i_bastion    $C7- Configure SSH Bastion"
   echo -e "$C10  i_podman     $C7- Install Podman"
   echo -e "$C10  i_monitoring $C7- Install InfluxDB + Grafana + Telegraf $C14*"
-  echo -e "$C2    i_grafana  $C7- Install Grafana $C14*"
   echo -e "$C2    i_influxdb $C7- Install InfluxDB $C14*"
+  echo -e "$C2    i_grafana  $C7- Install Grafana $C14*"
   echo -e "$C2    i_telegraf $C7- Install Telegraf $C14*"
   echo -e "$C9  i_gitlab     $C7- Install GitLab CE $C14*"
   echo -e "$C1   gl_backup   $C7- Create GitLab backup and move to localhost"

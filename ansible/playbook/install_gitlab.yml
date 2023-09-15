@@ -75,7 +75,7 @@
         url: "http://127.0.0.1:{{ gitlab_port }}/"
         follow_redirects: safe
       register: url_res
-      retries: 30
+      retries: 36
       delay: 10
       until: url_res.status == 200
       when: f_name.state == "file"

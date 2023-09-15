@@ -40,8 +40,8 @@
       - name: Restore GitLab backup with custom file name
         ansible.builtin.command: "podman exec -ti gitlab gitlab-backup restore BACKUP={{ gitlab_backup_custom }} force=yes"
         register: cmd_res
-        retries: 5
-        delay: 60
+        retries: 20
+        delay: 15
         until: cmd_res.rc == 0
         changed_when: false
         when:
@@ -50,8 +50,8 @@
       - name: Restore GitLab backup with standard file name
         ansible.builtin.command: "podman exec -ti gitlab gitlab-backup restore force=yes"
         register: cmd_res
-        retries: 5
-        delay: 60
+        retries: 20
+        delay: 15
         until: cmd_res.rc == 0
         changed_when: false
         when: gitlab_backup_custom is undefined or gitlab_backup_custom == ""
