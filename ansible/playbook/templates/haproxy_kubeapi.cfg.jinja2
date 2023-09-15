@@ -32,7 +32,7 @@ listen stats
     bind *:80
     stats enable
     stats uri /
-    stats auth root:haproxy
+    stats auth {{ haproxy_stats_user }}:{{ haproxy_stats_password }}
 
 {% for ws in hostvars[inventory_hostname].kube_api_proxy_port | list %}
 backend apiserver-{{ ws }}

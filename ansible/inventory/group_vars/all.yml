@@ -11,4 +11,6 @@ bastion_haproxy_kube: 8021
 bastion_key: "../secrets/key_bastion"
 machine_key: "../secrets/key_machine"
 kube_key: "../secrets/key_kube"
+haproxy_stats_user: "root"
+haproxy_stats_password: "haproxy"
 ...

@@ -57,7 +57,7 @@ listen proxy_stats
   bind *:{{ bastion_haproxy_main }}
   stats enable
   stats uri /
-  stats auth root:haproxy
+  stats auth {{ haproxy_stats_user }}:{{ haproxy_stats_password }}
 
 backend gitlab-ep
   server gitlab-web {{ hostvars[groups.gitlab | random].ansible_host }}:{{ hostvars[groups.gitlab | random].gitlab_port }} check
