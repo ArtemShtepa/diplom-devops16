@@ -78,8 +78,6 @@
       ansible.builtin.package:
         name: "haproxy"
         state: present
-    - debug:
-        msg: "{{ groups['kube_master'] }}"
     - name: Generate HAProxy configuration file
       ansible.builtin.template:
         src: "haproxy_kubeapi.cfg.jinja2"
