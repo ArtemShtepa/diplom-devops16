@@ -33,7 +33,7 @@
     tf_workspace: "{{ lookup('ansible.builtin.env', 'TF_WORKSPACE', default='default') }}"
   tasks:
     - name: Initialize main control plane
-      ansible.builtin.command: "kubeadm init --pod-network-cidr {{ kube_network_cidr }} --control-plane-endpoint {{ hostvars[groups.kube_proxy.0].ansible_host }}:{{ hostvars[groups.kube_proxy.0].kube_api_proxy_port[tf_workspace] }}"
+      ansible.builtin.command: "kubeadm init --pod-network-cidr {{ kube_network_cidr }} --control-plane-endpoint {{ hostvars[groups.kube_proxy.0].ansible_host }}:{{ hostvars[groups.kube_proxy.0].kube_api_proxy_port[tf_workspace] | default(hostvars[groups.kube_proxy.0].kube_api_proxy_port.stage, true) }}"
       register: adm_res
     - name: Get admin config file
       ansible.builtin.fetch:

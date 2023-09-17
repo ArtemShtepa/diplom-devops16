@@ -1,0 +1,16 @@
+apiVersion: qbec.io/v1alpha1
+kind: App
+metadata:
+  name: apiserver
+spec:
+  environments:
+    stage:
+      defaultNamespace: stage
+      server: https://{{ ansible_host }}:{{ kube_api_proxy_port.stage }}
+    prod:
+      defaultNamespace: prod
+      server: https://{{ ansible_host }}:{{ kube_api_proxy_port.prod }}
+  vars:
+    external:
+      - name: app_image_tag
+        default: "latest"

@@ -26,6 +26,7 @@ frontend apiserver-{{ ws }}
     mode tcp
     option tcplog
     default_backend apiserver-{{ ws }}
+
 {% endfor %}
 
 listen stats
@@ -44,4 +45,5 @@ backend apiserver-{{ ws }}
 {% for item in groups['kube_master'] %}
     server {{ ws }}-{{ item }} {{ hostvars[item].ansible_host }}:{{ hostvars[groups.kube_nodes.0].kube_api_port }} check
 {% endfor %}
+
 {% endfor %}

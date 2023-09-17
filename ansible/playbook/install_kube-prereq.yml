@@ -69,11 +69,10 @@
         checksum: "sha256:https://dl.k8s.io/v{{ kube_version }}/bin/linux/amd64/kubectl.sha256"
         mode: 0755
       when: ctl_res.rc == 2
-    - name: Download and install qbec
-      ansible.builtin.unarchive:
-        src: "https://github.com/splunk/qbec/releases/download/v{{ hostvars[groups.kube_nodes.0].qbec_version }}/qbec-linux-amd64.tar.gz"
-        dest: "/usr/local/bin"
-        remote_src: yes
+    - name: Install qbec
+      include_tasks: tasks_qbec.yml
+    - name: Install helm
+      include_tasks: tasks_helm.yml
     - name: Install HAProxy
       ansible.builtin.package:
         name: "haproxy"

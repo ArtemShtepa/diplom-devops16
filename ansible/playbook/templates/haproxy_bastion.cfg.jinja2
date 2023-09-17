@@ -53,6 +53,15 @@ frontend kubeapi_stats
   tcp-request inspect-delay 5s
   default_backend kubeapi-ep
 
+{% for ws in hostvars[inventory_hostname].bastion_app | list %}
+frontend app-{{ ws }}
+  bind *:{{ hostvars[inventory_hostname].bastion_app[ws] }}
+  mode tcp
+  option tcplog
+  default_backend app-{{ ws }}
+
+{% endfor %}
+
 listen proxy_stats
   bind *:{{ bastion_haproxy_main }}
   stats enable
@@ -60,17 +69,35 @@ listen proxy_stats
   stats auth {{ haproxy_stats_user }}:{{ haproxy_stats_password }}
 
 backend gitlab-ep
-  server gitlab-web {{ hostvars[groups.gitlab | random].ansible_host }}:{{ hostvars[groups.gitlab | random].gitlab_port }} check
+{% for h in groups.gitlab %}
+  server gitlab-web {{ hostvars[h].ansible_host }}:{{ hostvars[h].gitlab_port }} check
+{% endfor %}
 
 backend gitlab-ssh
   mode tcp
-  server gitlab-git {{ hostvars[groups.gitlab | random].ansible_host }}:{{ hostvars[groups.gitlab | random].gitlab_ssh_port }} check
+{% for h in groups.gitlab %}
+  server gitlab-git {{ hostvars[h].ansible_host }}:{{ hostvars[h].gitlab_ssh_port }} check
+{% endfor %}
 
 backend influxdb-ep
-  server influxdb-web {{ hostvars[groups.influxdb | random].ansible_host }}:{{ hostvars[groups.influxdb | random].influxdb_port }} check
+{% for h in groups.influxdb %}
+  server influxdb-web {{ hostvars[h].ansible_host }}:{{ hostvars[h].influxdb_port }} check
+{% endfor %}
 
 backend grafana-ep
-  server grafana-web {{ hostvars[groups.grafana | random].ansible_host }}:{{ hostvars[groups.grafana | random].grafana_port }} check
+{% for h in groups.grafana %}
+  server grafana-web {{ hostvars[h].ansible_host }}:{{ hostvars[h].grafana_port }} check
+{% endfor %}
 
 backend kubeapi-ep
-  server kubeapi-web {{ hostvars[groups.kube_proxy.0].ansible_host }}:80 check
+{% for h in groups.kube_proxy %}
+  server kubeapi-web {{ hostvars[h].ansible_host }}:80 check
+{% endfor %}
+
+{% for ws in hostvars[inventory_hostname].bastion_app | list %}
+backend app-{{ ws }}
+{% for h in groups.kube_master %}
+  server app-proxy-{{ h }} {{ hostvars[h].ansible_host }}:{{ hostvars[h].app_port[ws] }} check
+{% endfor %}
+
+{% endfor %}

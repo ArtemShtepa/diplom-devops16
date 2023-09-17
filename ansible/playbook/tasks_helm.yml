@@ -1,0 +1,15 @@
+- name: Download and install Helm
+  become: true
+  ansible.builtin.unarchive:
+    src: "https://get.helm.sh/helm-v{{ hostvars[groups.kube_nodes.0].helm_version }}-linux-amd64.tar.gz"
+    dest: "/usr/local/bin"
+    remote_src: true
+    extra_opts:
+      - "--strip-components=1"
+    exclude:
+      - "CHANGELOG.md"
+      - "README.md"
+      - "LICENSE"
+  when:
+    - hostvars[groups.kube_nodes.0].helm_version is defined
+    - hostvars[groups.kube_nodes.0].helm_version != ""

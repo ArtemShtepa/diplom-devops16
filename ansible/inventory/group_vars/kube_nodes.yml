@@ -7,6 +7,7 @@ kube_manifests:
   #- "https://raw.githubusercontent.com/projectcalico/calico/v3.26.1/manifests/calico.yaml"
   # - "https://raw.githubusercontent.com/projectcalico/calico/v3.26.1/manifests/custom-resources.yaml"
 qbec_version: "0.15.2"
+#helm_version: "3.12.3"
 containerd_version: "1.7.2"
 containerd_link: "https://github.com/containerd/containerd/releases/download/v{{ containerd_version }}/containerd-{{ containerd_version }}-linux-amd64.tar.gz"
 containerd_service_link: "https://raw.githubusercontent.com/containerd/containerd/main/containerd.service"

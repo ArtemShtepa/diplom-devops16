@@ -142,4 +142,42 @@
       ansible.builtin.template:
         src: "registry_list.jinja2"
         dest: "/etc/registry_list"
+
+- name: Create qbec project files
+  hosts: runner
+  vars:
+    project_path: "/home/gitlab-runner/apiserver/"
+  tasks:
+    - name: Install qbec
+      include_tasks: tasks_qbec.yml
+    - block:
+      - name: Search qbec project directories
+        ansible.builtin.find:
+          paths: "templates/app"
+          file_type: directory
+          recurse: true
+        register: d
+      - name: Search qbec project files
+        ansible.builtin.find:
+          paths: "templates/app"
+          file_type: file
+          recurse: true
+        register: f
+      delegate_to: localhost
+    - block:
+      - name: Create directories
+        ansible.builtin.file:
+          path: "{{ item.path | regex_replace('templates/app/', project_path) }}"
+          state: "directory"
+          owner: "gitlab-runner"
+          group: "gitlab-runner"
+        loop: "{{ d.files }}"
+      - name: Create files
+        ansible.builtin.template:
+          src: "{{ item.path | regex_replace('templates/', '') }}"
+          dest: "{{ item.path | regex_replace('templates/app/', project_path) }}"
+          owner: "gitlab-runner"
+          group: "gitlab-runner"
+        loop: "{{ f.files }}"
+      become: true
 ...

@@ -25,3 +25,24 @@
       loop: "{{ lst_res.files }}"
     - name: Combine files to user cumulative config
       ansible.builtin.shell: "KUBECONFIG={{ config_list[1:] }} kubectl config view --flatten > /home/{{ ansible_user }}/.kube/config"
+    - name: Fetch cumulative config file
+      ansible.builtin.fetch:
+        src: "/home/{{ ansible_user }}/.kube/config"
+        dest: "_kube_admin.conf"
+
+- name: Store cumulative config file to runners
+  hosts: runner
+  become: true
+  tasks:
+    - name: Create kube config directory
+      ansible.builtin.file:
+        path: "/home/gitlab-runner/.kube"
+        state: directory
+        owner: "gitlab-runner"
+        group: "gitlab-runner"
+    - name: Copy config file
+      ansible.builtin.copy:
+        src: "_kube_admin.conf"
+        dest: "/home/gitlab-runner/.kube/config"
+        owner: "gitlab-runner"
+        group: "gitlab-runner"

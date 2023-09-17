@@ -1,4 +1,7 @@
 ---
+- name: Add kubernetes hosts
+  ansible.builtin.import_playbook: dynamic_inv.yml
+
 - name: Configure routes on Bastion host
   hosts: bastion
   become: true
