@@ -12,5 +12,5 @@ spec:
       server: https://{{ ansible_host }}:{{ kube_api_proxy_port.prod }}
   vars:
     external:
-      - name: app_image_tag
+      - name: APP_IMAGE_TAG
         default: "latest"

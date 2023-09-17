@@ -10,8 +10,5 @@ base {
       cpu: "250m",
       memory: "128Mi"
     }
-  },
-  images +: {
-    pullPolicy: "Always"
   }
 }

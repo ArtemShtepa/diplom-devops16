@@ -1,4 +1,7 @@
 ---
+- name: Add kubernetes hosts
+  ansible.builtin.import_playbook: dynamic_inv.yml
+
 - name: Create Runner directory
   hosts: runner
   gather_facts: false
@@ -133,6 +136,9 @@
   vars:
     reg_cdt: "{{ lookup('file', '../../secrets/registry') | from_json }}"
   tasks:
+    - name: Enable podman running
+      become: true
+      ansible.builtin.command: "loginctl enable-linger gitlab-runner"
     - name: Login in registry
       ansible.builtin.command: "sudo -u gitlab-runner podman login {{ item.registry }} -u {{ item.user }} -p {{ item.password }}"
       no_log: true
@@ -145,24 +151,31 @@
 
 - name: Create qbec project files
   hosts: runner
+  gather_facts: false
   vars:
     project_path: "/home/gitlab-runner/apiserver/"
   tasks:
+    - name: Check qbec presence
+      ansible.builtin.command: "sudo -u gitlab-runner qbec version"
+      ignore_errors: true
+      changed_when: false
+      register: qb_res
     - name: Install qbec
       include_tasks: tasks_qbec.yml
+      when: qb_res.rc != 0
     - block:
       - name: Search qbec project directories
         ansible.builtin.find:
           paths: "templates/app"
           file_type: directory
           recurse: true
-        register: d
+        register: dir_list
       - name: Search qbec project files
         ansible.builtin.find:
           paths: "templates/app"
           file_type: file
           recurse: true
-        register: f
+        register: file_list
       delegate_to: localhost
     - block:
       - name: Create directories
@@ -171,13 +184,13 @@
           state: "directory"
           owner: "gitlab-runner"
           group: "gitlab-runner"
-        loop: "{{ d.files }}"
+        loop: "{{ dir_list.files }}"
       - name: Create files
         ansible.builtin.template:
           src: "{{ item.path | regex_replace('templates/', '') }}"
           dest: "{{ item.path | regex_replace('templates/app/', project_path) }}"
           owner: "gitlab-runner"
           group: "gitlab-runner"
-        loop: "{{ f.files }}"
+        loop: "{{ file_list.files }}"
       become: true
 ...

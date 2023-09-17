@@ -6,7 +6,7 @@
   },
   images: {
     frontend: "docker.io/artemshtepa/apiserver",
-    pullPolicy: "IfNotPresent"
+    pullPolicy: "Always"
   },
   components: {
   }

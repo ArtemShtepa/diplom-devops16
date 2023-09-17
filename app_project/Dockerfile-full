@@ -4,5 +4,6 @@ ADD src/apiserver.go __version__ ./
 RUN go mod init apiserver && go mod tidy && go build -ldflags="-X 'main.Version=$(cat __version__)'"
 
 FROM docker.io/alpine
+RUN apk --no-cache add curl
 COPY --from=compile-image /src/apiserver /apiserver
 ENTRYPOINT ["/apiserver"]

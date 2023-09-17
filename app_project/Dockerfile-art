@@ -1,3 +1,4 @@
 FROM docker.io/alpine
+RUN apk --no-cache add curl
 ADD /src/apiserver /apiserver
 ENTRYPOINT ["/apiserver"]

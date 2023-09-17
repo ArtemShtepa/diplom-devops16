@@ -6,19 +6,23 @@ stages:
 variables:
   #DFILE: "full"
   DFILE: "art"
+  CLUSTER_ENV: "stage"
+  VERSION_CMD: "git describe --always --tags"
 
 Compile:
   stage: compile
   #only:
   #  changes:
   #    - "**/*.go"
-  #variables:
+  variables:
   #  DFILE: "art"
+    GIT_STRATEGY: clone
   tags:
     - linux
     - podman
   script:
-    - git describe --always --tags > __version__
+    - $VERSION_CMD > __version__
+    - echo "Compiling application v$(cat __version__)..."
     - podman run --rm -v ./src:/src docker.io/golang:alpine sh -c "cd /src && go mod init apiserver && go mod tidy && go build -ldflags=\"-X 'main.Version=$(cat __version__)'\""
   artifacts:
     paths:
@@ -27,12 +31,15 @@ Compile:
 Build image:
   stage: build
   when: on_success
+  needs:
+    - Compile
   dependencies:
     - Compile
   tags:
     - podman
   script:
-    - git describe --always --tags > __version__
+    - echo "Building image with strategy $DFILE..."
+    - $VERSION_CMD > __version__
     - bash build.sh --build-$DFILE
 
 Push image:
@@ -40,21 +47,35 @@ Push image:
   when: manual
   needs:
     - Build image
-  only:
-    - tags
   tags: ['podman']
   script:
-    - echo $CI_COMMIT_TAG > __version__
+    - echo "Pushing image to registry..."
+    - $VERSION_CMD > __version__
     - bash build.sh --push
 
-Deploy:
+Deploy STAGE:
   stage: deploy
+  when: on_success
+  needs:
+    - Push image
+  tags: ['podman']
+  script:
+    - export APP_IMAGE_TAG=$($VERSION_CMD)
+    - echo "Deploying application v$APP_IMAGE_TAG for $CLUSTER_ENV..."
+    - cd ~/apiserver
+    - echo "y" | qbec apply $CLUSTER_ENV --wait --vm:ext-str APP_IMAGE_TAG=$APP_IMAGE_TAG
+
+Deploy PROD:
+  stage: deploy
+  when: manual
   needs:
     - Push image
   rules:
-    - if: $CI_COMMIT_TAG =~ /^[0-9]+\.[0-9]+$/
-      when: manual
+    - if: $CI_COMMIT_TAG =~ /^[0-9]+\.[0-9]+(\.[0-9]+|)$/
+      variables:
+        CLUSTER_ENV: "prod"
   tags: ['podman']
   script:
-    - echo "Deploying application v$CI_COMMIT_TAG..."
-    - echo "Application successfully deployed."
+    - echo "Deploying application v$CI_COMMIT_TAG for $CLUSTER_ENV..."
+    - cd ~/apiserver
+    - echo "y" | qbec apply $CLUSTER_ENV --wait --vm:ext-str APP_IMAGE_TAG=$CI_COMMIT_TAG

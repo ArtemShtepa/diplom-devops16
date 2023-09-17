@@ -32,7 +32,7 @@ local r_port = p.frontend.port;
           containers: [
             {
               name: r_chart,
-              image: p.images.frontend + ":" + std.extVar("app_image_tag"),
+              image: p.images.frontend + ":" + std.extVar("APP_IMAGE_TAG"),
               imagePullPolicy: p.images.pullPolicy,
               env: [
                 {
@@ -51,7 +51,7 @@ local r_port = p.frontend.port;
                 tcpSocket: {
                   port: r_port
                 },
-                initialDelaySeconds: 10,
+                initialDelaySeconds: 2,
                 periodSeconds: 10
               },
               livenessProbe: {
@@ -62,7 +62,7 @@ local r_port = p.frontend.port;
                     "http://127.0.0.1:" + r_port + "/uuid"
                   ]
                 },
-                initialDelaySeconds: 10,
+                initialDelaySeconds: 2,
                 periodSeconds: 10
               }
             }
