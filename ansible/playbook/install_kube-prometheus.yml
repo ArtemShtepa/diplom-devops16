@@ -1,0 +1,97 @@
+- name: Deploy Kube-Prometheus stack on cluster
+  hosts: kube_proxy
+  vars:
+    go_version: "1.21.1"
+    go_root: "/usr/local/go"
+    kp_path: "/home/{{ ansible_user }}/kube-prometheus"
+    go_install: [
+      { link: "-a github.com/jsonnet-bundler/jsonnet-bundler/cmd/jb@latest", app: "jb" },
+      { link: "github.com/brancz/gojsontoyaml@latest", app: "gojsontoyaml" },
+      { link: "github.com/google/go-jsonnet/cmd/jsonnet@latest", app: "jsonnet" },
+    ]
+  environment:
+    PATH: "{{ ansible_env.PATH }}:{{ go_root }}/bin"
+  tasks:
+    - name: Create directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+      loop:
+        - "{{ go_root }}"
+        - "/home/{{ ansible_user }}/kube-prometheus"
+    - name: Check GoLang installed
+      #ansible.builtin.shell: "bash -ilc 'go version'"
+      ansible.builtin.command: "go version"
+      ignore_errors: true
+      changed_when: false
+      register: go_res
+    - block:
+      - name: Download and unpack GoLang
+        ansible.builtin.unarchive:
+          src: "https://golang.org/dl/go{{ go_version }}.linux-amd64.tar.gz"
+          dest: "{{ go_root }}"
+          remote_src: true
+          extra_opts: ["--strip-components=1"]
+      - name: Create custom path
+        ansible.builtin.copy:
+          dest: "/etc/profile.d/golang-path.sh"
+          content: "export PATH=$PATH:{{ go_root }}/bin"
+      become: true
+      when: go_res.rc != 0
+    - name: Get GOPATH value
+      ansible.builtin.command: "go env GOPATH"
+      changed_when: false
+      register: env_res
+    - name: Set GOPATH to environment
+      ansible.builtin.set_fact:
+        go_path: "{{ env_res.stdout }}"
+      when: env_res.rc == 0
+    - name: Install GoLang packages
+      include_tasks: "tasks_go-install.yml"
+      loop: "{{ go_install }}"
+    #- name: Check JB installed
+    #  ansible.builtin.command: "jb --version"
+    #  ignore_errors: true
+    #  changed_when: false
+    #  register: jb_res
+    #- block:
+    #  - name: Install jsonnet-bundler
+    #    ansible.builtin.command: "go install -a github.com/jsonnet-bundler/jsonnet-bundler/cmd/jb@latest"
+    #  - name: Copy JB to GoLang binary
+    #    become: true
+    #    ansible.builtin.copy:
+    #      src: "{{ env_res.stdout }}/bin/jb"
+    #      dest: "{{ go_root }}/bin/jb"
+    #      remote_src: true
+    #      mode: 0755
+    #  when: jb_res.rc != 0
+    - name: Check JB project initialized
+      ansible.builtin.stat:
+        path: "{{ kp_path }}/jsonnetfile.json"
+      register: jp_init
+    - name: Init JB project
+      ansible.builtin.command: "jb init"
+      args:
+        chdir: "{{ kp_path }}"
+      when: jp_init.stat.exists == false
+    - name: Check JB project downloaded
+      ansible.builtin.stat:
+        path: "{{ kp_path }}/jsonnetfile.lock.json"
+      register: jp_lock
+    - name: Download Kube-Prometheus source
+      ansible.builtin.command: "jb install github.com/prometheus-operator/kube-prometheus/jsonnet/kube-prometheus@main"
+      args:
+        chdir: "{{ kp_path }}"
+      when: jp_lock.stat.exists == false
+    - name: Download configuration example
+      ansible.builtin.get_url:
+        url: "https://raw.githubusercontent.com/prometheus-operator/kube-prometheus/main/example.jsonnet"
+        dest: "{{ kp_path }}/example.jsonnet"
+    - name: Download build script
+      ansible.builtin.get_url:
+        url: "https://raw.githubusercontent.com/prometheus-operator/kube-prometheus/main/build.sh"
+        dest: "{{ kp_path }}/build.sh"
+    - name: Build Kube-Prometheus project
+      ansible.builtin.command: "bash build.sh example.jsonnet"
+      args:
+        chdir: "{{ kp_path }}"

@@ -1,0 +1,15 @@
+- name: Check package "{{ item.app }}" installed
+  ansible.builtin.stat:
+    path: "{{ go_root }}/bin/{{ item.app }}"
+  register: app_res
+- block:
+  - name: Install package "{{ item.app }}"
+    ansible.builtin.command: "go install {{ item.link }}"
+  - name: Copy app "{{ item.app }}" to GoLang binary
+    become: true
+    ansible.builtin.copy:
+      src: "{{ go_path }}/bin/{{ item.app }}"
+      dest: "{{ go_root }}/bin/{{ item.app }}"
+      remote_src: true
+      mode: 0755
+  when: app_res.stat.exists == false
