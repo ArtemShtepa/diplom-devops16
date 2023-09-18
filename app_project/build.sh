@@ -103,6 +103,7 @@ elif [[ $use_build_art = "false" && $use_build_full = "false" && $use_push = "fa
   echo "Use key --build-bull to compile application and build image"
   echo "Use key --push to push image to registry"
   echo "Use key --deploy to deploy app by qbec"
+  echo "Use key --clean to destroy app by qbec"
   exit 3
 elif [ "$use_stdin" = true ]; then
   while read a; do
