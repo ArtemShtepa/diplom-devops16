@@ -2,6 +2,7 @@ stages:
   - compile
   - build
   - deploy
+  - clean
 
 variables:
   #DFILE: "full"
@@ -62,8 +63,7 @@ Deploy STAGE:
   script:
     - export APP_IMAGE_TAG=$($VERSION_CMD)
     - echo "Deploying application v$APP_IMAGE_TAG for $CLUSTER_ENV..."
-    - cd ~/apiserver
-    - echo "y" | qbec apply $CLUSTER_ENV --wait --vm:ext-str APP_IMAGE_TAG=$APP_IMAGE_TAG
+    - bash build.sh --deploy
 
 Deploy PROD:
   stage: deploy
@@ -74,8 +74,34 @@ Deploy PROD:
     - if: $CI_COMMIT_TAG =~ /^[0-9]+\.[0-9]+(\.[0-9]+|)$/
       variables:
         CLUSTER_ENV: "prod"
+        APP_IMAGE_TAG: $CI_COMMIT_TAG
   tags: ['podman']
   script:
-    - echo "Deploying application v$CI_COMMIT_TAG for $CLUSTER_ENV..."
-    - cd ~/apiserver
-    - echo "y" | qbec apply $CLUSTER_ENV --wait --vm:ext-str APP_IMAGE_TAG=$CI_COMMIT_TAG
+    - echo "Deploying application v$APP_IMAGE_TAG for $CLUSTER_ENV..."
+    - bash build.sh --deploy
+
+Clean STAGE:
+  stage: clean
+  when: manual
+  needs:
+    - Deploy STAGE
+  tags: ['podman']
+  script:
+    - export APP_IMAGE_TAG=$($VERSION_CMD)
+    - echo "Destroy application v$APP_IMAGE_TAG at $CLUSTER_ENV..."
+    - bash build.sh --clean
+
+Clean PROD:
+  stage: clean
+  when: manual
+  needs:
+    - Deploy PROD
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^[0-9]+\.[0-9]+(\.[0-9]+|)$/
+      variables:
+        CLUSTER_ENV: "prod"
+        APP_IMAGE_TAG: $CI_COMMIT_TAG
+  tags: ['podman']
+  script:
+    - echo "Destroy application v$APP_IMAGE_TAG at $CLUSTER_ENV..."
+    - bash build.sh --clean
