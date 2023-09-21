@@ -1,6 +1,7 @@
 ---
 grafana_version: "10.0.5"
-grafana_port: "3000"
+grafana_port: 3000
+grafana_kube_port: 31000
 grafana_home: "/home/{{ ansible_user }}/grafana"
 grafana_admin_user: "root"
 grafana_admin_password: "grafana_(root)"

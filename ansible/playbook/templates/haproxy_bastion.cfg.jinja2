@@ -48,6 +48,11 @@ frontend grafana
   tcp-request inspect-delay 5s
   default_backend grafana-ep
 
+frontend grafana-kube
+  bind *:{{ bastion_grafana_kube }}
+  tcp-request inspect-delay 5s
+  default_backend grafana-kube-ep
+
 frontend kubeapi_stats
   bind *:{{ bastion_haproxy_kube }}
   tcp-request inspect-delay 5s
@@ -87,6 +92,11 @@ backend influxdb-ep
 backend grafana-ep
 {% for h in groups.grafana %}
   server grafana-web {{ hostvars[h].ansible_host }}:{{ hostvars[h].grafana_port }} check
+{% endfor %}
+
+backend grafana-kube-ep
+{% for h in groups.kube_proxy %}
+  server grafana-kube-web {{ hostvars[h].ansible_host }}:{{ hostvars[groups.grafana.0].grafana_kube_port }} check
 {% endfor %}
 
 backend kubeapi-ep

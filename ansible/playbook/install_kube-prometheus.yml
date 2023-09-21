@@ -4,13 +4,24 @@
     go_version: "1.21.1"
     go_root: "/usr/local/go"
     kp_path: "/home/{{ ansible_user }}/kube-prometheus"
+    kp_manifests_server: 17  # Минимальное число манифестов серверной части проекта
+    kp_manifests_main: 78    # Минимальное число манифестов основной части проекта
     go_install: [
       { link: "-a github.com/jsonnet-bundler/jsonnet-bundler/cmd/jb@latest", app: "jb" },
       { link: "github.com/brancz/gojsontoyaml@latest", app: "gojsontoyaml" },
       { link: "github.com/google/go-jsonnet/cmd/jsonnet@latest", app: "jsonnet" },
     ]
+    svc_name: "grafana"  # Имя используемое для проверки готовности Grafana как сервиса, так и пода
   environment:
     PATH: "{{ ansible_env.PATH }}:{{ go_root }}/bin"
+  handlers:
+    - name: Execute grafana forwarding
+      ansible.builtin.systemd:
+        name: "grafana-forwarding.service"
+        scope: user
+        enabled: true
+        daemon_reload: true
+        state: restarted
   tasks:
     - name: Create directories
       ansible.builtin.file:
@@ -19,6 +30,9 @@
       loop:
         - "{{ go_root }}"
         - "/home/{{ ansible_user }}/kube-prometheus"
+        - "/home/{{ ansible_user }}/.config"
+        - "/home/{{ ansible_user }}/.config/systemd"
+        - "/home/{{ ansible_user }}/.config/systemd/user"
     - name: Check GoLang installed
       #ansible.builtin.shell: "bash -ilc 'go version'"
       ansible.builtin.command: "go version"
@@ -91,7 +105,52 @@
       ansible.builtin.get_url:
         url: "https://raw.githubusercontent.com/prometheus-operator/kube-prometheus/main/build.sh"
         dest: "{{ kp_path }}/build.sh"
+    - name: Get list of Kube-Prometheus server-side manifests
+      ansible.builtin.find:
+        path: "{{ kp_path }}/manifests/setup"
+        patterns: ["*.yaml", "*.yml"]
+      register: mnf_server
+    - name: Get list of Kube-Prometheus manifests
+      ansible.builtin.find:
+        path: "{{ kp_path }}/manifests"
+        patterns:
+          - "*.yaml"
+          - "*.yml"
+      register: mnf_main
     - name: Build Kube-Prometheus project
       ansible.builtin.command: "bash build.sh example.jsonnet"
       args:
         chdir: "{{ kp_path }}"
+      when: mnf_server.files|length < kp_manifests_server or mnf_main.files|length < kp_manifests_main
+    - name: Get kubernetes service list in monitoring namespace
+      ansible.builtin.shell: "kubectl get svc -A -o json | jq -r '[ .items | .[] | .metadata.name ]'"
+      changed_when: false
+      register: svc_res
+    - name: Check grafana service exists
+      ansible.builtin.set_fact:
+        service_list: "{{ svc_res.stdout | from_json }}"
+    - block:
+      - name: Apply Kube-Prometheus server-side manifests
+        ansible.builtin.command: "kubectl apply --server-side -f manifests/setup"
+        args:
+          chdir: "{{ kp_path }}"
+      - name: Apply Kube-Prometheus manifests
+        ansible.builtin.command: "kubectl apply -f manifests/"
+        args:
+          chdir: "{{ kp_path }}"
+      when: svc_name not in service_list
+    - name: Wait until Grafana pod is ready
+      ansible.builtin.shell: "kubectl get pods -n monitoring -o json | jq -r '.items | .[] | select(.metadata.name? | match(\"{{ svc_name }}-*\")) | .status.phase'"
+      changed_when: false
+      register: pod_res
+      retries: 30
+      delay: 20
+      until: pod_res != "Running"
+    - name: Create grafana forwarding service file
+      ansible.builtin.template:
+        src: "grafana-kube.service.jinja2"
+        dest: "/home/{{ ansible_user }}/.config/systemd/user/grafana-forwarding.service"
+        mode: 0644
+      notify:
+        - Execute grafana forwarding
+

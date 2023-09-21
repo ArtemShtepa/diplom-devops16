@@ -6,6 +6,7 @@ bastion_gitlab: 8000
 bastion_git: 8001
 bastion_influxdb: 8010
 bastion_grafana: 8011
+bastion_grafana_kube: 8012
 bastion_haproxy_main: 8020
 bastion_haproxy_kube: 8021
 bastion_app:
