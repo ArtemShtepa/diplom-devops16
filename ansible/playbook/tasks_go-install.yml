@@ -1,10 +1,16 @@
+---
+# Блок исполняется в цикле, поэтому используется итератор item
+
+# Проверка наличия модуля
 - name: Check package "{{ item.app }}" installed
   ansible.builtin.stat:
     path: "{{ go_root }}/bin/{{ item.app }}"
   register: app_res
 - block:
+  # Установка модуля
   - name: Install package "{{ item.app }}"
     ansible.builtin.command: "go install {{ item.link }}"
+  # Копирование исполняемого файла модуля в каталог Go
   - name: Copy app "{{ item.app }}" to GoLang binary
     become: true
     ansible.builtin.copy:
@@ -13,3 +19,4 @@
       remote_src: true
       mode: 0755
   when: app_res.stat.exists == false
+...

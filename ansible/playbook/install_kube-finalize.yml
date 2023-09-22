@@ -1,48 +1,60 @@
+---
+# Создание общего файла подключения к kubernetes кластерам
 - name: Create cumulative admin kube config at kube proxy
   hosts: kube_proxy
   vars:
     config_list: ""
   tasks:
+    # Создание стандартной директории для файла подключения если её ещё нет
     - name: Create directory for kube config
       ansible.builtin.file:
         path: "/home/{{ ansible_user }}/.kube"
         state: directory
         mode: 0755
+    # Поиск сохранённых файлов настройки подключений
     - name: Search existed config files
       ansible.builtin.find:
         paths: "/home/{{ ansible_user }}/.kube"
         pattern: "config_*"
       register: lst_res
+    # Модификация имён в файлах настроек подключений - добавляется terraform workspace
     - name: Adding workspace name to config files
       ansible.builtin.replace:
         path: "{{ item.path }}"
         regexp: 'kubernetes'
         replace: 'kube-{{ item.path[20 + ansible_user|length :] }}'
       loop: "{{ lst_res.files }}"
+    # Формирование строки списка файлов настройки подключений
     - name: Create list of config files
       ansible.builtin.set_fact:
         config_list: "{{ config_list + ':' + item.path }}"
       loop: "{{ lst_res.files }}"
+    # Сбор всех файлов настройки подключений в один со стандартным именем
     - name: Combine files to user cumulative config
       ansible.builtin.shell: "KUBECONFIG={{ config_list[1:] }} kubectl config view --flatten > /home/{{ ansible_user }}/.kube/config"
+    # Загрузка получившегося файла настройки подключения на рабочую машину
     - name: Fetch cumulative config file
       ansible.builtin.fetch:
         src: "/home/{{ ansible_user }}/.kube/config"
         dest: "_kube_admin.conf"
 
+# Передача файла настройки подключения к кластеру на машинку с CI runner
 - name: Store cumulative config file to runners
   hosts: runner
   become: true
   tasks:
+    # Создание стандартной директории файла подключения к kubernetes кластеру для пользователя CI runner
     - name: Create kube config directory
       ansible.builtin.file:
         path: "/home/gitlab-runner/.kube"
         state: directory
         owner: "gitlab-runner"
         group: "gitlab-runner"
+    # Копирование файла настройки подключения к кластеру для пользователя CI runner
     - name: Copy config file
       ansible.builtin.copy:
         src: "_kube_admin.conf"
         dest: "/home/gitlab-runner/.kube/config"
         owner: "gitlab-runner"
         group: "gitlab-runner"
+...

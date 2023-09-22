@@ -1,8 +1,11 @@
+---
+# Ожидание готовности SSH бастиона
 - name: Wait for SSH Bastion ready
   gather_facts: false
   hosts: bastion
   tags: bastion
   tasks:
+    # Проверка отпечатка бастиона на рабочей машине
     - name: Check fingerprint existance
       ansible.builtin.command: "ssh-keygen -F {{ bastion_host }}"
       delegate_to: localhost
@@ -10,6 +13,7 @@
       ignore_errors: true
       register: fp_res
     - block:
+      # Добавления хоста бастиона в список известных
       - name: Add SSH Bastion fingerprint
         ansible.builtin.shell:
           ssh -o StrictHostKeyChecking=no
@@ -20,9 +24,11 @@
         retries: 6
         delay: 10
         until: res.rc == 0
+      # Запрос информации конкретной группы (pkg_mgr) по хосту 
       - name: Detect package manager
         ansible.builtin.setup:
           gather_subset: ["pkg_mgr"]
+      # Обновление кэша пакетного менеджера
       - name: Update package manager cache
         become: true
         ansible.builtin.package:
@@ -31,26 +37,33 @@
         - bastion_host != ""
         - fp_res.stdout_lines | count == 0
 
+# Добавление в Inventory хостов kubernetes кластера
 - name: Add kubernetes hosts
   ansible.builtin.import_playbook: dynamic_inv.yml
 
+# Ожидание готовности машинок
 - name: Wait for other instances ready
   gather_facts: false
   hosts: all
   tasks:
+    # Поиск отпечатка хоста на рабочей машине
     - name: Check fingerprint existance
       ansible.builtin.command: "ssh-keygen -F {{ ansible_host }}"
       delegate_to: localhost
       changed_when: false
       ignore_errors: true
       register: fp_res
+    # Блок добавления отпечатка хоста в список известных
     - block:
+      # Запрос у утилиты управления Яндекс.Облаком наличия машинки по назначенному ей IP адресу из inventory
+      # Если машинка не создавалась, то внутренний блок будет пропущен
       - name: Check internal IP from YC CLI
         ansible.builtin.shell: "yc compute instance list --format json | jq -r '.[] | select(.network_interfaces[0].primary_v4_address.address? | match(\"{{ ansible_host }}\")) | .network_interfaces[0].primary_v4_address.address'"
         changed_when: false
         delegate_to: localhost
         register: yci_res
       - block:
+        # Добавление отпечатка хоста подключением к нему
         - name: Add instance fingerprint
           ansible.builtin.shell:
             ssh -o StrictHostKeyChecking=no
@@ -63,9 +76,11 @@
           retries: 6
           delay: 10
           until: res.rc == 0
+        # Запрос информации по хосту определённой группы - пакетный менеджер
         - name: Detect package manager
           ansible.builtin.setup:
             gather_subset: ["pkg_mgr"]
+        # Обновление кэша пакетного менеджера
         - name: Update package manager cache
           become: true
           ansible.builtin.package:
@@ -74,3 +89,4 @@
       when:
         - fp_res.stdout_lines | count == 0
         - bastion_host != ""
+...

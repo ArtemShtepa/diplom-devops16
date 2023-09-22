@@ -1,25 +1,33 @@
 ---
+# Добавление в Inventory хостов kubernetes кластера
 - name: Add kubernetes hosts
   ansible.builtin.import_playbook: dynamic_inv.yml
 
+# Подготовка машинки для разворачивания на ней kubernetes кластера
 - name: Prepare kube cluster hosts
   hosts: kube_nodes
   become: true
   tasks:
+    # Проверка состояния swap
     - name: Check swap settings
       ansible.builtin.command: "sudo swapon --bytes --noheadings"
       register: swap_res
       changed_when: false
+    # блок отключение swap - требование kubernetes
     - name: Disabling swap
       block:
+        # Отключение в real-time
         - name: Disabling swap online
           ansible.builtin.command: "swapoff -a"
+        # Отключение точки монтирования разделов swap
         - name: Disabling swap on fstab
           ansible.builtin.shell: sed -ri '/\sswap\s/s/^#?/#/' /etc/fstab
       when: swap_res.stdout_lines | length > 0
+    # Устновка имени хоста из inventory
     - name: Set host name from playbook
       ansible.builtin.hostname:
         name: "{{ inventory_hostname }}"
+    # Установка соотвествия имени хостов кластера его IP адресам
     - name: Update host names
       ansible.builtin.blockinfile:
         path: "/etc/hosts"
@@ -29,39 +37,47 @@
           {{ hostvars[item]['ansible_host'] }} {{ item }}
           {% endfor %}
 
+# Устновка пакетов необходимых для работы kubernetes кластера
 - name: Install prerequirements
   hosts: kube_nodes
   tasks:
+    # Проверка состояния сокета containerd
     - name: Check containerd installed
       ansible.builtin.file:
         path: "/var/run/containerd/containerd.sock"
         state: file
       register: sock_res
       ignore_errors: true
+    # Подключение tasks для установки containerd
     - name: Install containerd runtime
       include_tasks: tasks_containerd.yml
       when: sock_res.failed == true
+    # Проверка наличия утилит kubernetes
     - name: Check kubenetes tools presence
       ansible.builtin.command: "kubeadm version -o yaml"
       register: kube_res
       changed_when: false
       ignore_errors: true
+    # Подключение tasks для утсановки утилит kubernetes
     - name: Install kubernetes tools
       include_tasks: tasks_kube-tools.yml
       when: kube_res.failed == true
 
+# Настройка proxy для доступа к kubernetes кластеру
 - name: Prepare kubectl proxy machine
   hosts: kube_proxy
   become: true
   vars:
     kube_version: "{{ hostvars[groups.kube_nodes.0].kube_version }}"
   tasks:
+    # Проверка наличия в системе kubectl
     - name: Check kubectl presence
       become: false
       ansible.builtin.command: "kubectl version -o json"
       ignore_errors: true
       changed_when: false
       register: ctl_res
+    # Загрузка и установка kubectl
     - name: Download and install kubectl
       ansible.builtin.get_url:
         url: "https://dl.k8s.io/release/v{{ kube_version }}/bin/linux/amd64/kubectl"
@@ -69,14 +85,24 @@
         checksum: "sha256:https://dl.k8s.io/v{{ kube_version }}/bin/linux/amd64/kubectl.sha256"
         mode: 0755
       when: ctl_res.rc == 2
+    # Подключение tasks установки qbec если необходимо
     - name: Install qbec
       include_tasks: tasks_qbec.yml
+      when:
+        - hostvars[groups.kube_nodes.0].qbec_version is defined
+        - hostvars[groups.kube_nodes.0].qbec_version != ""
+    # Подключение tasks установки helm если необходимо
     - name: Install helm
       include_tasks: tasks_helm.yml
+      when:
+        - hostvars[groups.kube_nodes.0].helm_version is defined
+        - hostvars[groups.kube_nodes.0].helm_version != ""
+    # Установка HAProxy
     - name: Install HAProxy
       ansible.builtin.package:
         name: "haproxy"
         state: present
+    # Генерирование конфигурационного файла HAProxy
     - name: Generate HAProxy configuration file
       ansible.builtin.template:
         src: "haproxy_kubeapi.cfg.jinja2"
@@ -84,6 +110,7 @@
       notify:
       - Restart HAProxy
   handlers:
+    # Перезапуск HAProxy - выполняется при изменении конфигурационного файла
     - name: Restart HAProxy
       ansible.builtin.service:
         name: "haproxy"

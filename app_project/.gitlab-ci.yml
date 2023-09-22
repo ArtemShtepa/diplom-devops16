@@ -52,7 +52,9 @@ Push image:
   script:
     - echo "Pushing image to registry..."
     - $VERSION_CMD > __version__
+    - podman login docker.io -u $(echo $GH_USER | base64 -d) -p $(echo $GH_PASSWORD | base64 -d)
     - bash build.sh --push
+    - podman logout --all
 
 Deploy STAGE:
   stage: deploy

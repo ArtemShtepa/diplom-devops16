@@ -1,25 +1,33 @@
+---
+# Добавление в Inventory хостов kubernetes кластера
 - name: Add kubernetes hosts
   ansible.builtin.import_playbook: dynamic_inv.yml
 
+# Удаление отпечатков машин Яндекс.Облака
 - name: Clear SSH fingerprints of Yandex.Cloud instances
   hosts: localhost
   vars:
     ip_list: []
     ip_bastion: "{{ lookup('ansible.builtin.env', 'BASTION_IP') }}"
   tasks:
+    # Запрос внутренних IP адресов машин у утилиты управления Яндекс.Облаком
     - name: Get internal IP from instances
       ansible.builtin.shell: "yc compute instance list --format json | jq -r '.[].network_interfaces[0].primary_v4_address.address'"
       changed_when: false
       register: ip_res
+    # Добовление полученных адресов в переменную (тип список)
     - name: Append internal IP addresses to list
       ansible.builtin.set_fact:
         ip_list: "{{ ip_list + ip_res.stdout_lines }}"
       when: ip_res.stdout_lines | length > 0
+    # Добавление в список IP адреса SSH бастиона
     - name: Append SSH Bastion IP to list
       ansible.builtin.set_fact:
         ip_list: "{{ ip_list + [ ip_bastion ] }}"
       when: ip_bastion != ""
+    # Удаление хостов из списка известных всем скопом
     - name: Remove hosts info from known_hosts
       ansible.builtin.command: "ssh-keygen -R {{ item }}"
       loop: "{{ ip_list }}"
       when: ip_list | length > 0
+...

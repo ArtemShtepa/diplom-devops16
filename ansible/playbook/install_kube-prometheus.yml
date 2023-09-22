@@ -1,3 +1,5 @@
+---
+# Сборка манифестов Kube-Prometheus и применение их в кластере
 - name: Deploy Kube-Prometheus stack on cluster
   hosts: kube_proxy
   vars:
@@ -15,6 +17,7 @@
   environment:
     PATH: "{{ ansible_env.PATH }}:{{ go_root }}/bin"
   handlers:
+    # Перезапуск демона port forwarding для Grafana из кластера
     - name: Execute grafana forwarding
       ansible.builtin.systemd:
         name: "grafana-forwarding.service"
@@ -23,6 +26,7 @@
         daemon_reload: true
         state: restarted
   tasks:
+    # Создание необходимых директорий
     - name: Create directories
       ansible.builtin.file:
         path: "{{ item }}"
@@ -33,83 +37,82 @@
         - "/home/{{ ansible_user }}/.config"
         - "/home/{{ ansible_user }}/.config/systemd"
         - "/home/{{ ansible_user }}/.config/systemd/user"
+    # Проверка наличия Go
     - name: Check GoLang installed
       #ansible.builtin.shell: "bash -ilc 'go version'"
       ansible.builtin.command: "go version"
       ignore_errors: true
       changed_when: false
       register: go_res
+    # Блок установки Go
     - block:
+      # Загрузка и распаковка архива с компилятором языка Go
       - name: Download and unpack GoLang
         ansible.builtin.unarchive:
           src: "https://golang.org/dl/go{{ go_version }}.linux-amd64.tar.gz"
           dest: "{{ go_root }}"
           remote_src: true
           extra_opts: ["--strip-components=1"]
+      # Создание файла дополняющего PATH каталогом компилятора Go после перезагрузки машинки - в принципе, данный этап можно не делать
       - name: Create custom path
         ansible.builtin.copy:
           dest: "/etc/profile.d/golang-path.sh"
           content: "export PATH=$PATH:{{ go_root }}/bin"
       become: true
       when: go_res.rc != 0
+    # Запрос переменной GOPATH - определфет куда будут устанавливаться дополнительные приложения
     - name: Get GOPATH value
       ansible.builtin.command: "go env GOPATH"
       changed_when: false
       register: env_res
+    # Запоминание пути приложений в переменной
     - name: Set GOPATH to environment
       ansible.builtin.set_fact:
         go_path: "{{ env_res.stdout }}"
       when: env_res.rc == 0
+    # Установка необходимых приложений
     - name: Install GoLang packages
       include_tasks: "tasks_go-install.yml"
       loop: "{{ go_install }}"
-    #- name: Check JB installed
-    #  ansible.builtin.command: "jb --version"
-    #  ignore_errors: true
-    #  changed_when: false
-    #  register: jb_res
-    #- block:
-    #  - name: Install jsonnet-bundler
-    #    ansible.builtin.command: "go install -a github.com/jsonnet-bundler/jsonnet-bundler/cmd/jb@latest"
-    #  - name: Copy JB to GoLang binary
-    #    become: true
-    #    ansible.builtin.copy:
-    #      src: "{{ env_res.stdout }}/bin/jb"
-    #      dest: "{{ go_root }}/bin/jb"
-    #      remote_src: true
-    #      mode: 0755
-    #  when: jb_res.rc != 0
+    # Проверка инициализации проекта jsonnet-bundler
     - name: Check JB project initialized
       ansible.builtin.stat:
         path: "{{ kp_path }}/jsonnetfile.json"
       register: jp_init
+    # Инициализация проекта если она не была выполнена
     - name: Init JB project
       ansible.builtin.command: "jb init"
       args:
         chdir: "{{ kp_path }}"
       when: jp_init.stat.exists == false
+    # Проверка готовности проекта - всё ли загружено
     - name: Check JB project downloaded
       ansible.builtin.stat:
         path: "{{ kp_path }}/jsonnetfile.lock.json"
       register: jp_lock
+    # Загрузка файлов проекта если они ещё не загружены
     - name: Download Kube-Prometheus source
       ansible.builtin.command: "jb install github.com/prometheus-operator/kube-prometheus/jsonnet/kube-prometheus@main"
       args:
         chdir: "{{ kp_path }}"
       when: jp_lock.stat.exists == false
+    # Загрузка примера конфигурационного файла сборки манифестов
     - name: Download configuration example
       ansible.builtin.get_url:
         url: "https://raw.githubusercontent.com/prometheus-operator/kube-prometheus/main/example.jsonnet"
         dest: "{{ kp_path }}/example.jsonnet"
+    # Загрузка скрипта сборки манифестов
     - name: Download build script
       ansible.builtin.get_url:
         url: "https://raw.githubusercontent.com/prometheus-operator/kube-prometheus/main/build.sh"
         dest: "{{ kp_path }}/build.sh"
+    # Формирование списка манифестов серверной части
     - name: Get list of Kube-Prometheus server-side manifests
       ansible.builtin.find:
         path: "{{ kp_path }}/manifests/setup"
         patterns: ["*.yaml", "*.yml"]
       register: mnf_server
+    # Формирование списка манифестов проекта
     - name: Get list of Kube-Prometheus manifests
       ansible.builtin.find:
         path: "{{ kp_path }}/manifests"
@@ -117,35 +120,43 @@
           - "*.yaml"
           - "*.yml"
       register: mnf_main
+    # Сборка манифестов проекта если их нет, либо их не полное количество
     - name: Build Kube-Prometheus project
       ansible.builtin.command: "bash build.sh example.jsonnet"
       args:
         chdir: "{{ kp_path }}"
       when: mnf_server.files|length < kp_manifests_server or mnf_main.files|length < kp_manifests_main
+    # Запрос списка всех сервисов kubernetes кластера
     - name: Get kubernetes service list in monitoring namespace
       ansible.builtin.shell: "kubectl get svc -A -o json | jq -r '[ .items | .[] | .metadata.name ]'"
       changed_when: false
       register: svc_res
+    # Сохранение списка сервисов в переменную (тип список)
     - name: Check grafana service exists
       ansible.builtin.set_fact:
         service_list: "{{ svc_res.stdout | from_json }}"
+    # блок применения манифестов проекта - применяется если в списке сервисов kubernetes кластера нет нужного
     - block:
+      # применение манифестов серверной части
       - name: Apply Kube-Prometheus server-side manifests
         ansible.builtin.command: "kubectl apply --server-side -f manifests/setup"
         args:
           chdir: "{{ kp_path }}"
+      # применение оставшихся манифестов
       - name: Apply Kube-Prometheus manifests
         ansible.builtin.command: "kubectl apply -f manifests/"
         args:
           chdir: "{{ kp_path }}"
       when: svc_name not in service_list
+    # Ожидание готовности pod с Grafana - разворачиванеи проекта может длиться 10 минут и более
     - name: Wait until Grafana pod is ready
       ansible.builtin.shell: "kubectl get pods -n monitoring -o json | jq -r '.items | .[] | select(.metadata.name? | match(\"{{ svc_name }}-*\")) | .status.phase'"
       changed_when: false
       register: pod_res
-      retries: 30
+      retries: 40
       delay: 20
       until: pod_res != "Running"
+    # Создание файла для активации port forwarding к сервису Grafana (клстера)
     - name: Create grafana forwarding service file
       ansible.builtin.template:
         src: "grafana-kube.service.jinja2"
@@ -153,4 +164,4 @@
         mode: 0644
       notify:
         - Execute grafana forwarding
-
+...

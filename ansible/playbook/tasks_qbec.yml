@@ -1,3 +1,5 @@
+---
+# Загрузка и установка qbec
 - name: Download and install qbec
   become: true
   ansible.builtin.unarchive:
@@ -8,6 +10,4 @@
       - "CHANGELOG.md"
       - "README.md"
       - "LICENSE"
-  when:
-    - hostvars[groups.kube_nodes.0].qbec_version is defined
-    - hostvars[groups.kube_nodes.0].qbec_version != ""
+...

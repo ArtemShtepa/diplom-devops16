@@ -1,9 +1,13 @@
 ---
+# Добавление в Inventory хостов kubernetes кластера
 - name: Add kubernetes hosts
   tags:
     - sudo
   ansible.builtin.import_playbook: dynamic_inv.yml
 
+# Установка пакета sudo и отключение запроса пароля для пользователя при повышении привилегий
+#   Данный play необходим только при использовании локальных машин - поэтому присутствует метка never
+#   Настраивает их подобно стандартным машинам Яндекс.Облака.
 - name: Install sudo package with root
   hosts: all
   tags:
@@ -12,32 +16,40 @@
   vars:
     ansible_ssh_common_args: ""
   tasks:
+    # Запоминание имени пользователя в переменную
     - name: Save user name
       set_fact:
         remote_user: "{{ ansible_user }}"
+    # Исзменение пользователя в параметрах подключения Ansible на root
     - name: Change SSH user
       set_fact:
         ansible_user: root
+    # Установка пакета sudo на целевой машине
     - name: Install sudo to allow become
       ansible.builtin.package:
         name: sudo
         state: present
+    # Отключение запроса пароля пользователя при повышении привилегий
     - name: Disable password prompt
       ansible.builtin.copy:
         dest: "/etc/sudoers.d/{{ remote_user }}"
         content: "{{ remote_user }} ALL=(ALL:ALL) NOPASSWD:ALL"
+    # Обновление имени хоста для машинки и заодно проверка установки пакета sudo
     - name: Update hostname from playbook
       become: true
       ansible.builtin.hostname:
         name: "{{ inventory_hostname }}"
 
+# Подготовка машинок
 - name: Bootstrap machines
   hosts: all
   become: true
   tasks:
+    # Обновление кэша пакетного менеджера
     - name: Update package cache with universal module
       ansible.builtin.package:
         update_cache: true
+    # Запись в файл хостов списка машин кластера
     - name: Update hosts file
       ansible.builtin.blockinfile:
         dest: /etc/hosts

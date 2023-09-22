@@ -2,6 +2,7 @@
 - name: Restore GitLab backup
   hosts: gitlab
   tasks:
+    # Проверка существования файла резервной копии GitLab
     - name: Check backup file exists
       ansible.builtin.file:
         path: "files/{{ gitlab_backup }}"
@@ -10,26 +11,13 @@
       ignore_errors: true
       register: f_name
     - block:
-      #- name: Copy GitLab secrets file
-      #  ansible.builtin.copy:
-      #    src: "gitlab-secrets.json"
-      #    dest: "{{ gitlab_home }}/config/gitlab-secrets.json"
-      #- name: Get permission of backups
-      #  ansible.builtin.stat:
-      #    path: "{{ gitlab_home }}/data/git-data"
-      #  register: bp
-      #- name: Copy GitLab backup file
-      #  become: true
-      #  ansible.builtin.copy:
-      #    src: "{{ gitlab_backup }}"
-      #    dest: "{{ gitlab_home }}/data/backups/latest_gitlab_backup.tar"
-      #    owner: "{{ bp.stat.uid }}"
-      #    group: "{{ bp.stat.gid }}"
+      # Распаковка файлов из единого архива резервной копии с рабочей машины на машину GitLab
       - name: Extract files from backup archive
         become: true
         ansible.builtin.unarchive:
           src: "files/{{ gitlab_backup }}"
           dest: "{{ gitlab_home }}"
+      # Остановка некоторых модулей GitLab, чтобы они не мешали восстановлению
       - name: Stop internal gitlab services
         ansible.builtin.command: "podman exec -ti gitlab gitlab-ctl stop {{ item }}"
         loop:
@@ -37,6 +25,7 @@
           - "sidekiq"
         register: cmd_res
         changed_when: false
+      # Запуск процесса восстановления GitLab из резервной копии с произвольным именем
       - name: Restore GitLab backup with custom file name
         ansible.builtin.command: "podman exec -ti gitlab gitlab-backup restore BACKUP={{ gitlab_backup_custom }} force=yes"
         register: cmd_res
@@ -47,6 +36,7 @@
         when:
           - gitlab_backup_custom is defined
           - gitlab_backup_custom != ""
+      # Запуск процесса восстановления GitLab из резервной копии со стандартным именем
       - name: Restore GitLab backup with standard file name
         ansible.builtin.command: "podman exec -ti gitlab gitlab-backup restore force=yes"
         register: cmd_res
@@ -55,6 +45,7 @@
         until: cmd_res.rc == 0
         changed_when: false
         when: gitlab_backup_custom is undefined or gitlab_backup_custom == ""
+      # Перезапуск GitLab
       - name: Restart Gitlab container
         containers.podman.podman_container:
           name: gitlab
@@ -64,7 +55,7 @@
         retries: 10
         delay: 6
         until: rst_res.changed
-      # Удаление файлов из каталога резервныз копий GitLab
+      # Удаление файлов из каталога резервных копий GitLab
       - name: Empty GitLab backup directory
         become: true
         block:

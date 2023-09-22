@@ -1,8 +1,10 @@
 ---
+# Установка podman
 - name: Install podman
   hosts: podman
   become: true
   tasks:
+    # Установка полузных для отладки утилит
     - name: Install other packages
       ansible.builtin.package:
         name: "{{ item }}"
@@ -10,14 +12,17 @@
       loop:
         - curl
         - htop
+    # Устновка пакета podman из стандартного репозитория дистрибутива ОС
     - name: Install podman package
       ansible.builtin.package:
         name: podman
         state: present
       register: ins_res
+    # Разрешение запускать задач podman без авторизации пользователя - иначе контейнеры будут работать только когда пользователь авторизован - в данном случае подключен к машине через SSH
     - name: Enable Podman executing without login
       ansible.builtin.command: "loginctl enable-linger {{ ansible_user }}"
       changed_when: false
+    # Перезагрузка машинки и ожидание её ответа
     - name: Reboot machine
       ansible.builtin.reboot:
         post_reboot_delay: 20

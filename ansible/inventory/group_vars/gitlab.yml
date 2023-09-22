@@ -1,8 +1,17 @@
 ---
-gitlab_version: "16.3.2"
+# Используемая версия GitLab
+gitlab_version: "16.3.4"
+# Каталог размещения файлов GitLab
 gitlab_home: "/home/{{ ansible_user }}/gitlab"
+
+# Внутренний порт web интерфейса GitLab
 gitlab_port: "8081"
+# Внутренний порт SSH доступа Git
 gitlab_ssh_port: "6022"
+
+# Имя файла резервной копии на рабочей машине
 gitlab_backup: "_gitlab_{{ gitlab_version }}_backup.tar"
+
+# Переменная для использования произвольного имени файла резервной копии
 #gitlab_backup_custom: "temp"
 ...

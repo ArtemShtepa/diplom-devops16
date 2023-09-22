@@ -1,11 +1,18 @@
 ---
-# Общие параметры
+# --- Общие параметры ---
+# Каталог файлов runner
 runner_home: "/home/{{ ansible_user }}/gitlab-runner"
+# Ключ регистрации runner - получается при первичной настройке Runner в интерфейсе GitLab
 runner_token: "glrt-NZYEfymt7sqf-FGjfS2N"
-# Используется при регистрации SHELL
+
+# --- Используется при регистрации SHELL ---
+# Название Runner
 runner_name: "ShellRunner"
-# Используется при регистрации DOCKER
+# --- Используется при регистрации DOCKER ---
+# Тэг образа runner с dockerhub
 runner_version: "alpine-v16.3.0"
+# Используемый порт
 runner_port: 8093
+# Docker образ Runner по умолчанию
 runner_image: "golang:1.21.1-alpine"
 ...

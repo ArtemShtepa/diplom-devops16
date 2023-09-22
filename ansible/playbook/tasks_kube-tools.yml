@@ -1,3 +1,5 @@
+---
+# Установка необходимых пакетов
 - name: Install necessary packages
   become: true
   ansible.builtin.package:
@@ -10,25 +12,31 @@
       - gnupg2
     state: present
 
+# Блок настройки репозитория для пакетного менеджера APT
 - block:
+  # Проверка существования файла ключа
   - name: Check APT key exists
     ansible.builtin.stat:
       path: "/etc/apt/trusted.gpg.d/cgoogle.gpg"
     register: key_res
   - block:
+    # Загрузка файла ключа
     - name: Download keyring file
       ansible.builtin.get_url:
         url: "https://packages.cloud.google.com/apt/doc/apt-key.gpg"
         dest: "/tmp/cgoogle.gpg"
+    # Создание совместимого с APT ключа
     - name: Create APT key
       ansible.builtin.command: "gpg --dearmour -o /etc/apt/trusted.gpg.d/cgoogle.gpg /tmp/cgoogle.gpg"
     when: key_res.stat.exists == False
+  # Создание файла репозитория ubernetes
   - name: Create kubernetes repo
     ansible.builtin.copy:
       dest: "/etc/apt/sources.list.d/kubernetes.list"
       content: "deb https://apt.kubernetes.io/ kubernetes-xenial main"
       mode: 0600
     register: rep_res
+  # Обновление кэша пакетного менеджера
   - name: Update APT cache
     ansible.builtin.apt:
       update_cache: true
@@ -36,6 +44,7 @@
   become: true
   when: ansible_pkg_mgr == 'apt'
 
+# Установка утилит kubernetes конкретной версии
 - name: Install kubernetes tools
   become: true
   ansible.builtin.package:
@@ -44,6 +53,7 @@
       - "kubeadm={{ kube_version }}-00"
       - "kubectl={{ kube_version }}-00"
     state: present
+# Перезагрузка машинки с ожиданием ей ответа
 - name: Reboot machine
   become: true
   ansible.builtin.reboot:
@@ -51,3 +61,4 @@
     reboot_timeout: 120
     connect_timeout: 180
     test_command: uptime
+...

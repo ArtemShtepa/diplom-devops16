@@ -1,51 +1,64 @@
 ---
+# Добавление в Inventory хостов kubernetes кластера
 - name: Add kubernetes hosts
   ansible.builtin.import_playbook: dynamic_inv.yml
 
+# play проверки существования рабочего кластера и если он есть сбрасывает его
 - name: Check cluster presence
   hosts: kube_nodes
   tasks:
+    # Запрос текущего состояния kubelet
     - name: Get kubelet status
       ansible.builtin.command: "systemctl is-active kubelet"
       register: kbl_res
       changed_when: false
       ignore_errors: true
+    # Прекращение исполнения play если kubelet не активен
     - name: Exit if there is no active kubelet
       meta: end_host
       when: kbl_res.stdout != "active"
+    # Сброс kubernetes кластера
     - name: Reset cluster node by kubeadm
       become: true
       ansible.builtin.command: "kubeadm reset -f"
+    # Удаление конфигурационных файлов сетевых модулей
     - name: Remove CNI configuration
       become: true
       ansible.builtin.file:
         path: "/etc/cni/net.d"
         state: absent
+    # Удаление файла настройки подключения к кластеру
     - name: Remove kubeconfig
       ansible.builtin.file:
         path: "~/.kube/config"
         state: absent
 
+# PLay создания основной Master ноды kubernetes кластера
 - name: Create main control plane
   hosts: kube_master[0]
   become: true
   vars:
     tf_workspace: "{{ lookup('ansible.builtin.env', 'TF_WORKSPACE', default='default') }}"
   tasks:
+    # Инициализация Control Plane через KubeAdm
     - name: Initialize main control plane
       ansible.builtin.command: "kubeadm init --pod-network-cidr {{ kube_network_cidr }} --control-plane-endpoint {{ hostvars[groups.kube_proxy.0].ansible_host }}:{{ hostvars[groups.kube_proxy.0].kube_api_proxy_port[tf_workspace] | default(hostvars[groups.kube_proxy.0].kube_api_proxy_port.stage, true) }}"
       register: adm_res
+    # Загрузка файла подключения к кластеру на рабочую машину
     - name: Get admin config file
       ansible.builtin.fetch:
         src: "/etc/kubernetes/admin.conf"
         dest: "files/_kube_admin.conf"
         flat: true
+    # Регенерирование сертификатов, чтобы получить его ключ
     - name: Generate certificate keys
       ansible.builtin.shell: "kubeadm init phase upload-certs --upload-certs | tail -n1"
       register: cert_key
+    # Регенерирование токена и запрос команды включения ноды в состав kubernetes кластера
     - name: Generate token for joining
       ansible.builtin.command: "kubeadm token create --print-join-command"
       register: kube_join
+    # Сохранение команды подключения дополнительных Control Plane в файл на рабочей машине
     - name: Create join command to control planes
       become: false
       ansible.builtin.copy:
@@ -53,6 +66,7 @@
         dest: "files/_kube_join_controlplane"
         mode: 0777
       delegate_to: localhost
+    # Сохранение команды подключения рабочих нод в файл на рабочей(локальной) машине
     - name: Create join command to workers
       become: false
       ansible.builtin.copy:
@@ -61,26 +75,31 @@
         mode: 0777
       delegate_to: localhost
 
+# play первоначальной подготовки машинки, выступающей в качестве proxy для доступа к kubernetes кластеру
 - name: Copy admin kube config at kube proxy
   hosts: kube_proxy
   vars:
     tf_workspace: "{{ lookup('ansible.builtin.env', 'TF_WORKSPACE', default='default') }}"
     kube_config: "/home/{{ ansible_user }}/.kube/config_{{ tf_workspace }}"
   tasks:
+    # Создание директории для файла настройки подключения
     - name: Create directory for kube config
       ansible.builtin.file:
         path: "/home/{{ ansible_user }}/.kube"
         state: directory
         mode: 0755
+    # Копирование файла подключения к кластеру с рабочей машины на proxy
     - name: Copy admin config to user`s home
       ansible.builtin.copy:
         src: "files/_kube_admin.conf"
         dest: "{{ kube_config }}"
         mode: 0644
+    # Чистка кэша если он есть
     - name: Remove the cache directory.
       ansible.builtin.file:
         path: "/home/{{ ansible_user }}/.kube/cache"
         state: absent
+    # Применение манифестов - как мимнимум сетевых модулей
     - name: Apply manifests
       ansible.builtin.command: "kubectl --kubeconfig {{ kube_config }} apply -f {{ item }}"
       loop: "{{ hostvars[groups.kube_nodes.0].kube_manifests }}"
@@ -89,20 +108,25 @@
       register: ctl_res
       until: ctl_res.rc == 0
 
+# play включения в состав kubernetes кластера оставшихся Master нод
 - name: Join additional control planes
   hosts: kube_master[1:]
   vars:
     join_cmd: "{{ lookup('file', 'files/_kube_join_controlplane') }}"
   tasks:
+    # Выполнение команды, прочитанной из созданного на предыдущих шагах файла
     - name: Initialize join
       become: true
       ansible.builtin.command: "{{ join_cmd }}"
 
+# play включения в состав kubernetes кластера рабочих нод
 - name: Join worker nodes
   hosts: kube_worker
   vars:
     join_cmd: "{{ lookup('file', 'files/_kube_join_worker') }}"
   tasks:
+    # Выполнение команды, прочитанной из созданного на предыдущих шагах файла
     - name: Initialize join
       become: true
       ansible.builtin.command: "{{ join_cmd }}"
+...

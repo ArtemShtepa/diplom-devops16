@@ -2,6 +2,7 @@
 - name: Install prerequirements
   hosts: gitlab
   tasks:
+    # Создание директорий, необходимых для разворачивания GitLab
     - name: Create Gitlab directories
       ansible.builtin.file:
         path: "{{ gitlab_home }}/{{ item }}"
@@ -13,10 +14,12 @@
         - "data"
         - "config"
         - "logs"
+    # Создание конфигурационного файла GitLab
     - name: Create GitLab configuration file
       ansible.builtin.template:
         src: "gitlab.rb.jinja2"
         dest: "{{ gitlab_home }}/config/gitlab.rb"
+    # Запуск контейнера GitLab
     - name: Run Gitlab container
       containers.podman.podman_container:
         name: gitlab
@@ -36,6 +39,7 @@
           - "{{ gitlab_home }}/config:/etc/gitlab"
           - "/etc/timezone:/etc/timezone:ro"
           - "/etc/localtime:/etc/localtime:ro"
+    # Ожидание создания контейнером GitLab некоторых директорий
     - name: Wait for necessary directory
       ansible.builtin.wait_for:
         path: "{{ gitlab_home }}/{{ item }}"
@@ -43,13 +47,13 @@
       loop:
         - "data/backups"
         - "data/git-data"
-# Запуск GitLab в качестве сервиса
+    # Запуск GitLab в качестве сервиса
     - name: Run as service
       ansible.builtin.systemd:
         name: podman-gitlab
         scope: user
         enabled: true
-# Определение существования резервной копии GitLab
+    # Определение существования резервной копии GitLab
     - name: Determining need for GitLab readiness
       ansible.builtin.file:
         path: "files/{{ gitlab_backup }}"
@@ -57,7 +61,7 @@
       delegate_to: localhost
       ignore_errors: true
       register: f_name
-# Блок вывода пароля администратора при инициализации GitLab
+    # Блок вывода пароля администратора при инициализации GitLab
     - block:
       - name: Get initial password
         ansible.builtin.shell: "cat {{ gitlab_home }}/config/initial_root_password | grep Password:"
@@ -69,7 +73,7 @@
           msg: "{{ cmd_res.stdout }}"
         when: cmd_res.rc == 0
       when: gitlab_backup is undefined or gitlab_backup == "" or f_name.state == "absent"
-# Ожидание готовности GitLab если будет запущено восстановление из резервной копии
+    # Ожидание готовности GitLab если будет запущено восстановление из резервной копии
     - name: Wait until GitLab is ready
       ansible.builtin.uri:
         url: "http://127.0.0.1:{{ gitlab_port }}/"
@@ -79,6 +83,7 @@
       delay: 10
       until: url_res.status == 200
       when: f_name.state == "file"
+# Передача управления на playbook восстановления резервной копии
 - name: Restore backup
   ansible.builtin.import_playbook: backup_restore.yml
 ...

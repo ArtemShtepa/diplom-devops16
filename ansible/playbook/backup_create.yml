@@ -5,6 +5,7 @@
   vars:
     backup_filepath: "/home/{{ ansible_user }}/{{ gitlab_backup }}"
   tasks:
+    # Блок создания резервной копии в файл с произвольным именем - gitlab_backup_custom
     - block:
       - name: Create backup with custom file name
         become: false
@@ -17,6 +18,7 @@
       when:
         - gitlab_backup_custom is defined
         - gitlab_backup_custom != ""
+    # Блок создания резервной копии в файл со стандартным для GitLab именем
     - block:
       - name: Create backup with standard file name
         become: false
@@ -28,6 +30,7 @@
         register: f_name
       when: gitlab_backup_custom is undefined or gitlab_backup_custom == ""
     - block:
+      # Создание единого tar архива с резервной копией и файлами конфигурации
       - name: Pack files in one archive
         ansible.builtin.archive:
           format: tar
@@ -36,11 +39,13 @@
             - "{{ gitlab_home }}/config/gitlab.rb"
             - "{{ gitlab_home }}/config/gitlab-secrets.json"
           dest: "{{ backup_filepath }}"
+      # Загрузка получившегося архива на рабочую машину
       - name: Transfer backup to local machine
         ansible.builtin.fetch:
           src: "{{ backup_filepath }}"
           dest: "files/"
           flat: true
+      # Удаление временных файлов
       - name: Delete backup from GitLab direcoty and temporary files
         ansible.builtin.file:
           path: "{{ item }}"

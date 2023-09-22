@@ -1,9 +1,11 @@
+---
 - name: Configure Terraform for Yandex CLI
   hosts: localhost
   vars:
     terraform_version: "1.5.4"
     terraform_path: "~/.local/bin"
   tasks:
+    # Нстройка рабочей машинки на использование зеркал Яндекс.Облака
     - name: Create terraform provider link to Yandex Mirror
       ansible.builtin.copy:
         dest: "~/.terraformrc"
@@ -17,29 +19,37 @@
               exclude = ["registry.terraform.io/*/*"]
             }
           }
+    # Запрос актуальной версии утилиты управления Яндекс.Облаком
     - name: Get latest YC CLI version
       ansible.builtin.set_fact:
         yc_ver: "{{ lookup('ansible.builtin.url', 'https://storage.yandexcloud.net/yandexcloud-yc/release/stable') }}"
+    # Прверка текущей версии утилиты с актуальной - если версии не совпадут, то вывод будет пуск
     - name: Check YC CLI installation
       ansible.builtin.shell: "yc --version | grep {{ yc_ver }}"
       changed_when: false
       ignore_errors: true
       register: yc_res
+    # Блок установка утилиты управления Яндекс.Облаком
     - block:
+      # Пробуем обновиться с установленной утилиты
       - name: Try update YC CLI
         ansible.builtin.command: "yc components update"
       rescue:
+      # Пробуем установить утилиту с нуля
       - name: Install YC CLI
         ansible.builtin.shell: "curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash"
       when: yc_res.rc != 0 or yc_res.stdout_lines|length == 0
+    # Сверка установленной версии Terraform с актуальной - если отличаются, то нужно переустановить Terraform
     - name: Check Terraform installation
       ansible.builtin.shell: "terraform --version | grep {{ terraform_version }}"
       changed_when: false
       ignore_errors: true
       register: tf_res
+    # Загрузка исполняемого файла Terraform с зеркала Яндекс.Облака
     - name: Download Terraform from Yandex Mirror
       ansible.builtin.unarchive:
         src: "https://hashicorp-releases.yandexcloud.net/terraform/{{ terraform_version }}/terraform_{{ terraform_version }}_linux_amd64.zip"
         dest: "{{ terraform_path }}"
         remote_src: yes
       when: tf_res.rc != 0 or tf_res.stdout_lines|length == 0
+...

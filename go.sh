@@ -34,6 +34,7 @@ C13='\e[1;35m'
 C14='\e[1;33m'
 C15='\e[1;37m'
 
+# Определение команды получения информации о машинках - используется в отладке на ВМ
 if [ "$is_local_vm" = true ]; then
   vm_list_cmd="cat $init_dir/secrets/yc_local"
   export VM_LIST_CMD=$vm_list_cmd
@@ -41,14 +42,17 @@ else
   vm_list_cmd="yc compute instance list --format json"
 fi
 
+# Проверка наличия Ansible
 if ! [ -x "$(command -v ansible)" ]; then
   echo -e "$C12 Ansible not found.$CR Use$C14 init$CR command" >&2
 fi
 
+# Проверка наличия Terraform
 if ! [ -x "$(command -v terraform)" ]; then
   echo -e "$C12 Terraform is not installed.$CR Use$C14 init$CR command" >&2
 fi
 
+# Функция получения идентификаторов Яндекс.Облака
 get_yc_vars() {
   yc_cloud=$(yc config get cloud-id 2>/dev/null)
   if [ $? -eq 0 ]; then
@@ -61,20 +65,27 @@ get_yc_vars() {
   #export TF_VAR_YC_ZONE=$(yc config get compute-default-zone)
 }
 
+# Проверка налиия утилиты управления Яндекс.Облаком
 if ! [ -x "$(command -v yc)" ]; then
   echo -e "$C12 Yandex CLI is not installed.$CR Use$C14 init$CR command" >&2
 else
+  # Определение файла сервисного аккаунта
   export TF_VAR_YC_SA_FILE=$(pwd)/$(ls secrets/sa_file*.json | head -n1)
+  # Определение идентификатора сервисного аккаунта
   export TF_VAR_YC_SA_ID=$(cat $TF_VAR_YC_SA_FILE | jq -r .service_account_id)
+  # Создание ключей доступа если их нет
   if ! [ -f secrets/sa_key.json ]; then
     echo -e "$C10 Generate access key for service account...$CR"
     yc iam access-key create --service-account-id $TF_VAR_YC_SA_ID --format json > secrets/sa_key.json
   fi
+  # Чтение ключей доступа
   access_key=$(cat secrets/sa_key.json | jq -r .access_key.key_id)
   secret_key=$(cat secrets/sa_key.json | jq -r .secret)
+  # Запрос остальных переменных дял подключения
   get_yc_vars
 fi
 
+# Функция генерирования пары ключей
 create_ssh_key() {
   if ! [ -f "secrets/key_$1" ]; then
     echo -e "$C10 Generate SSH key for $C11$1...$C8"
@@ -83,6 +94,7 @@ create_ssh_key() {
   fi
 }
 
+# Функция инициализации - установки необходимых утилит, генерирование ключей, сервисного аккаунта и S3 хранилища
 init() {
   if ! [ -x "$(command -v ansible)" ]; then
     echo -e "$C10 Install Ansible...$C8"
@@ -110,10 +122,11 @@ init() {
     echo -e "$C10 Generate access key for service account...$C8"
     yc iam access-key create --service-account-name $sa_name --format json > secrets/sa_key.json
   fi
+  # Создание ключей
   create_ssh_key bastion
   create_ssh_key kube
   create_ssh_key machine
-  # Создание бакета
+  # Создание S3 бакета
   if ! $(yc storage bucket get $storage_name 1>/dev/null 2>&1); then
     echo -e "$C10 Create S3 storage...$C8"
     if ! $(yc storage bucket create --name $storage_name 1>/dev/null 2>&1); then
@@ -123,6 +136,7 @@ init() {
   fi
 }
 
+# Функция чистки - удаляет ресурсы и большинство файлов, которые могут быть сгенерированы вновь
 clean() {
   cd $init_dir
   echo -e "$C12 Remove temporary files...$C8"
@@ -136,6 +150,7 @@ clean() {
   yc iam service-account delete --name $sa_name 2>/dev/null
 }
 
+# Функция определения IP адреса и имени пользователя для подключения к SSH бастиону
 check_bastion() {
   cd $terraform_dir
   export TF_WORKSPACE=$(terraform workspace show)
@@ -162,6 +177,8 @@ tf_init() {
   terraform workspace select stage
 }
 
+# Функция запуска команд Terraform
+# Передаёт terraform все параметры, но если первый stage или prod, то сначала переключает на соответствующее пространство
 run_terraform() {
   cd $terraform_dir
   if [ "$1" == "stage" -o "$1" == "prod" ]; then
@@ -188,6 +205,9 @@ tf_destroy() {
   run_terraform $* destroy --auto-approve
 }
 
+# Функция исполнения playbook
+# Первым параметром должно быть true/false - требуется ли определять параметры SSH бастиона
+# Остальные параметры - список исполняемых playbook
 run_playbook() {
   if [ "$#" -gt 1 ]; then
     if [ $1 == "true" ]; then
@@ -207,66 +227,69 @@ i_sudo() {
   ansible-playbook -i inventory playbook/bootstrap_hosts.yml --tags sudo
 }
 
+# Установка podman где необходимо
 i_podman() {
   run_playbook true install_podman.yml
 }
-
+# Установка GitLab
 i_gitlab() {
   run_playbook true install_gitlab.yml
 }
-
+# Создание резервной копии GitLab
 gl_backup() {
   run_playbook true backup_create.yml
 }
-
+# Восстановление GitLab из резервной копии
 gl_restore() {
   run_playbook true backup_restore.yml
 }
-
+# Устновка стека мониторинга в правильном порядке: InfluxDB + Grafana + Telegraf
 i_monitoring() {
   run_playbook true install_influxdb.yml install_grafana.yml install_telegraf.yml
 }
-
+# Установка Grafana
 i_grafana() {
   run_playbook true install_grafana.yml
 }
-
+# Установка InfluxDB
 i_influxdb() {
   run_playbook true install_influxdb.yml
 }
-
+# Установка Telegraf
 i_telegraf() {
   run_playbook true install_telegraf.yml
 }
-
+# Подготовка машинки с GitLab Runner
 i_runner() {
   run_playbook true install_runner.yml
 }
-
+# Обновление пакетов на всех машинках
 i_update() {
   run_playbook true bootstrap_hosts.yml
 }
-
+# Настройка SSH бастиона
 i_bastion() {
   run_playbook true configure_bastion.yml
 }
-
+# Подготовка машинок, предназначенных для размещения kubernetes кластера
 i_kube_pre() {
   run_playbook true install_kube-prereq.yml
 }
-
+# Установка и настройка kubernetes кластера
 i_kube_cl() {
   run_playbook true install_kube-cluster.yml
 }
-
+# Настройка proxy машинки доступа к kubernetes кластеру
 i_kube_proxy() {
   run_playbook true install_kube-finalize.yml
 }
-
+# Разворачивание проекта Kube-Prometheus в кластере
 i_kube_mon() {
   run_playbook true install_kube-prometheus.yml
 }
 
+# Функция подключения к выбранной машинке по SSH и выпонение команды
+# В параметре указывается имя машинки. Если передано только имя машинки запускается bash
 run_vm() {
   check_bastion
   if [ "$1" == "" ]; then
@@ -289,6 +312,7 @@ run_vm() {
   fi
 }
 
+# Функция запуска остановленных машин в Яндекс.Облаке
 rearm() {
   for n in $($vm_list_cmd | jq -r '.[] | select(.status != "RUNNING") | .name'); do
     echo -e "$C14 Rearm instance: $C13$n $CR..."
@@ -303,6 +327,7 @@ rearm() {
   done
 }
 
+# Функция вывода версий используемого ПО
 versions() {
   cd $ansible_dir
   echo -e "$C8-$C7-$C15-$C7-$C8- $C10 Git / CI $C8-$C7-$C15-$C7-$C8-$CR"

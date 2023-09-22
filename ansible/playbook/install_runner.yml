@@ -1,7 +1,9 @@
 ---
+# Добавление в Inventory хостов kubernetes кластера
 - name: Add kubernetes hosts
   ansible.builtin.import_playbook: dynamic_inv.yml
 
+# Создание директории Runner - в основном для хранения файла его установщика
 - name: Create Runner directory
   hosts: runner
   gather_facts: false
@@ -19,18 +21,23 @@
   vars:
     repo_script: "{{ runner_home }}/repo-install.sh"
   tasks:
+    # Проверка существования скрипта установки
     - name: Check repo installation script
       ansible.builtin.file:
         path: "{{ repo_script }}"
         state: "file"
       register: rep_rest
       ignore_errors: true
+    # блок загрузки скрипта установки
     - block:
+      # блок для пакетного менеджера APT
       - block:
+        # Загрузка скрипта
         - name: Download installation script for DEB
           ansible.builtin.get_url:
             url: https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.deb.sh
             dest: "{{ repo_script }}"
+        # pinning - привязка - смена приоритета репозитория для пакета
         - name: Apply APT pinning
           become: true
           ansible.builtin.copy:
@@ -41,37 +48,46 @@
               Pin: origin packages.gitlab.com
               Pin-Priority: 1001
         when: ansible_pkg_mgr == "apt"
+      # загрузка скрипта для пакетных менеджеров YUM и DNF
       - name: Download installation script for RPM
         ansible.builtin.get_url:
           url: https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.rpm.sh
           dest: "{{ repo_script }}"
         when: ansible_pkg_mgr == "yum" or ansible_pkg_mgr == "dnf"
+      # Исполнение скрипта - добавление репозитория GitLab Runner
       - name: Add GitLab repositories
         become: true
         ansible.builtin.command: "bash {{ runner_home }}/repo-install.sh"
       when: rep_rest.state == "absent"
+    # Установка пакета GitLAb Runner
     - name: Install Runner package
       become: true
       ansible.builtin.package:
         name: gitlab-runner
         state: present
         update_cache: true
+    # Запрос списка зарегистрированных runner - используется shell, так как вывод осуществляется строго в stderr
     - name: Get list of registered runners
       become: true
       ansible.builtin.shell: "gitlab-runner list"
       changed_when: false
       ignore_errors: true
       register: r_res
+    # Проверка регистрации нашего Runner
     - name: Check shell runner existance
       ansible.builtin.set_fact:
         runner_list: "{{ r_res.stderr_lines | select('search', runner_name) }}"
+    # Блок регистрации Runner
     - block:
+      # Настройка диапазона разрешённых идентификаторов для UID
       - name: Configure UIDs for gitlab-runner
         become: true
         ansible.builtin.command: "usermod --add-subuids 10000-65535 gitlab-runner"
+      # Настройка диапазона разрешённых идентификаторов для GID
       - name: Configure GIDs for gitlab-runner
         become: true
         ansible.builtin.command: "usermod --add-subgids 10000-65535 gitlab-runner"
+      # Регистрация экземпляра Runner в исполнителе GitLab-Runner
       - name: Register shell runner
         become: true
         ansible.builtin.command:
@@ -84,6 +100,8 @@
       when: runner_list | length == 0
 
 # Установка Runner в виде контейнера podman и регистрация как DOCKER
+# Не используется по техническим сложностям использования в проекте
+# Оставлено для примера
 - name: Install GitLab Runner AS docker executor
   hosts: runner
   tags:
@@ -129,47 +147,50 @@
         scope: user
         enabled: true
 
-# Создание файла списка registry и обновление авторизации в них для агента podman
-- name: Update credentails for registry
+# Создание файла списка registry
+- name: Update registry list
   hosts: runner
   tags: registry
+  become: true
   vars:
     reg_cdt: "{{ lookup('file', '../../secrets/registry') | from_json }}"
   tasks:
+    # Разрешение автозапуска сервисов пользователя
     - name: Enable podman running
-      become: true
       ansible.builtin.command: "loginctl enable-linger gitlab-runner"
-    - name: Login in registry
-      ansible.builtin.command: "sudo -u gitlab-runner podman login {{ item.registry }} -u {{ item.user }} -p {{ item.password }}"
-      no_log: true
-      loop: "{{ reg_cdt }}"
-    - name: Create registry link file
-      become: true
+    # Создание списка доступных registry для Docker образов - настраивается через внешний файл
+    - name: Create registry list file
       ansible.builtin.template:
         src: "registry_list.jinja2"
         dest: "/etc/registry_list"
 
+# Формирование каталога с файлами проекта приложения для qbec
 - name: Create qbec project files
   hosts: runner
   gather_facts: false
   vars:
     project_path: "/home/gitlab-runner/deploy/"
   tasks:
+    # Проверка присутствия qbec
     - name: Check qbec presence
       ansible.builtin.command: "sudo -u gitlab-runner qbec version"
       ignore_errors: true
       changed_when: false
       register: qb_res
+    # Подключение tasks установки qbec
     - name: Install qbec
       include_tasks: tasks_qbec.yml
       when: qb_res.rc != 0
+    # Блок формирования структуры проекта приложения
     - block:
+      # формирование списка каталогов
       - name: Search qbec project directories
         ansible.builtin.find:
           paths: "templates/app"
           file_type: directory
           recurse: true
         register: dir_list
+      # Формирование списка файлов
       - name: Search qbec project files
         ansible.builtin.find:
           paths: "templates/app"
@@ -177,7 +198,9 @@
           recurse: true
         register: file_list
       delegate_to: localhost
+    # Блок создания на машинке проекта приложения
     - block:
+      # Создание каталогов
       - name: Create directories
         ansible.builtin.file:
           path: "{{ item.path | regex_replace('templates/app/', project_path) }}"
@@ -185,6 +208,7 @@
           owner: "gitlab-runner"
           group: "gitlab-runner"
         loop: "{{ dir_list.files }}"
+      # Создание файлов по шаблонам - в некоторых используются адреса и порты, настраиваемые в переменных ansible
       - name: Create files
         ansible.builtin.template:
           src: "{{ item.path | regex_replace('templates/', '') }}"

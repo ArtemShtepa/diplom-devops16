@@ -1,11 +1,14 @@
 ---
+# Добавление в Inventory хостов kubernetes кластера
 - name: Add kubernetes hosts
   ansible.builtin.import_playbook: dynamic_inv.yml
 
+# Конфигурирование марщрутов на бастионе
 - name: Configure routes on Bastion host
   hosts: bastion
   become: true
   tasks:
+    # Установка HAProxy и полезных для отладки утилит
     - name: Install packages
       ansible.builtin.package:
         name: "{{ item }}"
@@ -14,12 +17,14 @@
       - haproxy
       - curl
       - htop
+    # Генерирование конфигурационного файла HAProxy
     - name: Generate HAProxy configuration file
       ansible.builtin.template:
         src: "haproxy_bastion.cfg.jinja2"
         dest: "/etc/haproxy/haproxy.cfg"
       notify:
       - Restart HAProxy
+  # Обработчики событий - присутствует только одно - перезапуск демона если конфигурационный файл изменился
   handlers:
     - name: Restart HAProxy
       ansible.builtin.service:

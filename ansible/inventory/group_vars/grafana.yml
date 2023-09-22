@@ -1,10 +1,20 @@
 ---
+# Используемая версия Grafana для отображения статистики основных машин
 grafana_version: "10.0.5"
+
+# Внутренний порт Grafana
 grafana_port: 3000
+# Внутренний порт Grafana в кластере kubernetes
 grafana_kube_port: 31000
+# Путь хранения файлов Grafana
 grafana_home: "/home/{{ ansible_user }}/grafana"
+
+# Логин администратора Grafana. Для kubernetes используется стандартный - admin
 grafana_admin_user: "root"
+# Пароль администратора Grafana. Для kubernetes используется стандартный - admin
 grafana_admin_password: "grafana_(root)"
+# Логин пользователя Grafana (основной узел)
 grafana_view_user: "viewer"
+# Пароль пользователя Grafana (основной узел)
 grafana_view_password: "viewer_password"
 ...

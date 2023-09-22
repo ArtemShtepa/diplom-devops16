@@ -2,15 +2,18 @@
 - name: Install prerequirements
   hosts: telegraf
   tasks:
+    # Создание директории расположения конфигурационного файла Telegraf
     - name: Create Telegraf directories
       ansible.builtin.file:
         path: "{{ telegraf_home }}"
         state: directory
+    # Копирование подготовленного ранее конфигурационного файла Telegraf
     - name: Copy Telegraf configuration file
       ansible.builtin.copy:
         src: "_telegraf.conf"
         dest: "{{ telegraf_home }}/telegraf.conf"
       register: cnf_res
+    # Запуск контейнера с Telegraf с генерированием service файла
     - name: Run Telegraf container
       containers.podman.podman_container:
         name: telegraf
@@ -38,6 +41,7 @@
             #- /etc:/hostfs/etc:ro
             - "/:/hostfs:ro"
         network: host
+    # Принудительный перезапуск контейнера Telegraf если конфигурационный файл изменился
     - name: Restart Telegraf container
       containers.podman.podman_container:
         name: telegraf
@@ -48,6 +52,7 @@
       delay: 6
       until: rst_res.changed
       when: cnf_res.changed
+    # Активация запуска Telegraf при старте машинки
     - name: Run as service
       ansible.builtin.systemd:
         name: podman-telegraf

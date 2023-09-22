@@ -1,9 +1,19 @@
 ---
+# Используемая версия InfluxDB
 influxdb_version: "2.7.1"
+
+# Путь хранения файлов InfluxDB
 influxdb_home: "/home/{{ ansible_user }}/influxdb"
-influxdb_user: "root"
-influxdb_password: "influxdb_(root)"
+# Внутренний порт для доступа к InfluxDB
 influxdb_port: 8086
+
+# Логин администратора InfluxDB
+influxdb_user: "root"
+# Пароль администратора InfluxDB
+influxdb_password: "influxdb_(root)"
+
+# Название организации
 influxdb_org: "SA-Netology"
+# Имя bucket, куда будут сохраняться данные
 influxdb_bucket: "main"
 ...

@@ -1,4 +1,5 @@
 ---
+# Генерированеи динамического inventory на основе вывода утилиты управления Яндекс.Облаком
 - name: Generate dynamic inventory for Kubernetes cluster hosts
   gather_facts: false
   hosts: localhost
@@ -6,11 +7,13 @@
     tf_workspace: "{{ lookup('ansible.builtin.env', 'TF_WORKSPACE') }}"
     vm_list_cmd: "{{ lookup('ansible.builtin.env', 'VM_LIST_CMD', default='yc compute instance list --format json') }}"
   tasks:
+    # Поиск среди машин Яндекс.Облака мастеров Kubernetes
     - name: Search kubernetes master instances
       ansible.builtin.shell: "{{ vm_list_cmd }} | jq '[ .[] | select(.name? | match(\"{{ tf_workspace }}-kube-master-*\")) ]'"
       register: yc_instances
       failed_when: yc_instances.rc != 0
       changed_when: false
+    # Добавление хостов в inventory
     - name: Add instances kube-master group
       ansible.builtin.add_host:
         groups:
@@ -21,11 +24,13 @@
         host: "{{ item['name'][tf_workspace|length+1:] }}"
       loop: "{{ yc_instances.stdout | from_json }}"
       changed_when: false
+    # Поиск среди машин Яндекс.Облака рабочих нод Kubernetes
     - name: Search kubernetes worker instances
       ansible.builtin.shell: "{{ vm_list_cmd }} | jq '[ .[] | select(.name? | match(\"{{ tf_workspace }}-kube-worker-*\")) ]'"
       register: yc_instances
       failed_when: yc_instances.rc != 0
       changed_when: false
+    # Добавление хостов в inventory
     - name: Add instances kube-worker group
       ansible.builtin.add_host:
         groups:

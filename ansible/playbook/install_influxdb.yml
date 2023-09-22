@@ -2,6 +2,7 @@
 - name: Install prerequirements
   hosts: influxdb
   tasks:
+    # Создание директорий, необходимых для разворачивания Grafana
     - name: Create InfluxDB directories
       ansible.builtin.file:
         path: "{{ influxdb_home }}/{{ item }}"
@@ -10,6 +11,7 @@
         - ""
         - "data"
         - "config"
+    # Запуск контейнера InfluxDB
     - name: Run InfluxDB container
       containers.podman.podman_container:
         name: influxdb
@@ -25,6 +27,7 @@
         volume:
           - "{{ influxdb_home }}/data:/var/lib/influxdb2"
           - "{{ influxdb_home }}/config:/etc/influxdb2"
+    # Генерирование стандартного конфигурационного файла InfluxDB
     - name: Configure InfluxDB Instance
       ansible.builtin.command: >-
         podman exec influxdb
@@ -39,30 +42,37 @@
         - 'cmd_res.rc != 0'
         - '"has already been set up" not in cmd_res.stderr'
       changed_when: cmd_res.rc == 0
+    # Получение идентификатора bucket
     - name: Get bucket ID from CLI
       ansible.builtin.command: >-
         podman exec influxdb
         influx bucket list -n "{{ influxdb_bucket }}" -o "{{ influxdb_org }}" --hide-headers --json
       register: cmd_res
       changed_when: false
+    # Сохранение полученного идентификатора bucket в переменной
     - name: Set backet ID to ansible fact
       ansible.builtin.set_fact:
         influxdb_bucket_id: "{{ (cmd_res.stdout | from_json)[0].id }}"
+    # Запрос токенов доступа к InfluxDB
     - name: Get InfluxDB tokens info
       ansible.builtin.command: "podman exec influxdb influx auth list --json"
       register: cmd_res
       changed_when: false
+    # Поиск токена с правами чтения
     - name: Search READ token
       ansible.builtin.set_fact:
         influxdb_token_read: "{{ item.token }}"
       when: item.description == 'READ token'
       loop: "{{ cmd_res.stdout | from_json }}"
+    # Поиск токена с правами записи
     - name: Search WRITE token
       ansible.builtin.set_fact:
         influxdb_token_write: "{{ item.token }}"
       when: item.description == 'WRITE token'
       loop: "{{ cmd_res.stdout | from_json }}"
+    # Блок создания токена доступа с правами чтения - исполняется если до этого его не удалось прочитать
     - block:
+        # Запрос на создание токена
         - name: Create READ token
           ansible.builtin.command: >-
             podman exec -ti influxdb
@@ -73,16 +83,20 @@
             --json
           register: cmd_res
           changed_when: false
+        # Сохранение токена в переменную
         - name: Get READ token
           ansible.builtin.set_fact:
             influxdb_token_read: "{{ (cmd_res.stdout | from_json).token }}"
       when: (influxdb_token_read is undefined) or (influxdb_token_read == '')
+    # Подготовка конфигурационного файла настройки источника данных для Grafana
     - name: Template GRAFANA data source provisioning
       ansible.builtin.template:
         src: "grafana-ds-influxdb.yml.jinja2"
         dest: "files/_grafana-ds-influxdb.yml"
       delegate_to: localhost
+    # Блок создания токена доступа с правами записи - исполняется если до этого его не удалось прочитать
     - block:
+        # Запрос на создание токена
         - name: Create WRITE token
           ansible.builtin.command: >-
             podman exec -ti influxdb
@@ -93,15 +107,18 @@
             --json
           register: cmd_res
           changed_when: false
+        # Сохранение токена в переменную
         - name: Get WRITE token
           ansible.builtin.set_fact:
             influxdb_token_write: "{{ (cmd_res.stdout | from_json).token }}"
       when: (influxdb_token_write is undefined) or (influxdb_token_write == '')
+    # Подготовка конфигурационного файла настройки источника данных для Telegraf
     - name: Template TELEGRAF configuration file
       ansible.builtin.template:
         src: telegraf.conf.jinja2
         dest: files/_telegraf.conf
       delegate_to: localhost
+    # Активация автоматического запуска InfluxDB при старте машинки
     - name: Run as service
       ansible.builtin.systemd:
         name: podman-influxdb
