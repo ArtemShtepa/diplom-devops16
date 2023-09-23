@@ -5,7 +5,8 @@ Description=Kube-Prometheus Grafana Port Forwarding
 Type=simple
 StandardOutput=journal
 ExecStart=/usr/local/bin/kubectl port-forward svc/grafana --address {{ hostvars[groups.kube_proxy.0].ansible_host }} -n monitoring {{ hostvars[groups.grafana.0].grafana_kube_port }}:3000
-Restart=no
+Restart=always
+RestartSec=30
 
 [Install]
 WantedBy=default.target
