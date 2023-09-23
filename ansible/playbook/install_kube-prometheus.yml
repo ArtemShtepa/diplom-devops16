@@ -26,13 +26,23 @@
         daemon_reload: true
         state: restarted
   tasks:
+    # Установка пакета jq
+    - name: Install jq package
+      become: true
+      ansible.builtin.package:
+        name: jq
+        state: present
     # Создание необходимых директорий
-    - name: Create directories
+    - name: Create GoLang directory
+      become: true
+      ansible.builtin.file:
+        path: "{{ go_root }}"
+        state: directory
+    - name: Create user directories
       ansible.builtin.file:
         path: "{{ item }}"
         state: directory
       loop:
-        - "{{ go_root }}"
         - "/home/{{ ansible_user }}/kube-prometheus"
         - "/home/{{ ansible_user }}/.config"
         - "/home/{{ ansible_user }}/.config/systemd"
@@ -109,13 +119,13 @@
     # Формирование списка манифестов серверной части
     - name: Get list of Kube-Prometheus server-side manifests
       ansible.builtin.find:
-        path: "{{ kp_path }}/manifests/setup"
+        path: "{{ kp_path }}/manifests/setup/"
         patterns: ["*.yaml", "*.yml"]
       register: mnf_server
     # Формирование списка манифестов проекта
     - name: Get list of Kube-Prometheus manifests
       ansible.builtin.find:
-        path: "{{ kp_path }}/manifests"
+        path: "{{ kp_path }}/manifests/"
         patterns:
           - "*.yaml"
           - "*.yml"
