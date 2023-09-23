@@ -32,11 +32,13 @@
     # Сбор всех файлов настройки подключений в один со стандартным именем
     - name: Combine files to user cumulative config
       ansible.builtin.shell: "KUBECONFIG={{ config_list[1:] }} kubectl config view --flatten > /home/{{ ansible_user }}/.kube/config"
+      changed_when: false
     # Загрузка получившегося файла настройки подключения на рабочую машину
     - name: Fetch cumulative config file
       ansible.builtin.fetch:
         src: "/home/{{ ansible_user }}/.kube/config"
-        dest: "_kube_admin.conf"
+        dest: "files/_kube_admin.conf"
+        flat: true
 
 # Передача файла настройки подключения к кластеру на машинку с CI runner
 - name: Store cumulative config file to runners

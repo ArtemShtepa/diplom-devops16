@@ -119,13 +119,13 @@
     # Формирование списка манифестов серверной части
     - name: Get list of Kube-Prometheus server-side manifests
       ansible.builtin.find:
-        path: "{{ kp_path }}/manifests/setup/"
+        path: "{{ kp_path }}/manifests/setup"
         patterns: ["*.yaml", "*.yml"]
       register: mnf_server
     # Формирование списка манифестов проекта
     - name: Get list of Kube-Prometheus manifests
       ansible.builtin.find:
-        path: "{{ kp_path }}/manifests/"
+        path: "{{ kp_path }}/manifests"
         patterns:
           - "*.yaml"
           - "*.yml"
@@ -165,7 +165,7 @@
       register: pod_res
       retries: 40
       delay: 20
-      until: pod_res != "Running"
+      until: pod_res.stdout == "Running"
     # Создание файла для активации port forwarding к сервису Grafana (клстера)
     - name: Create grafana forwarding service file
       ansible.builtin.template:

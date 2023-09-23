@@ -1,6 +1,6 @@
 ---
 # Используемая версия kubernetes
-kube_version: "1.27.4"
+kube_version: "1.28.2"
 
 # Внутренний порт api сервера
 kube_api_port: "6443"
@@ -19,7 +19,7 @@ qbec_version: "0.15.2"
 #helm_version: "3.12.3"
 # Используемая версия containerd
 
-containerd_version: "1.7.2"
+containerd_version: "1.7.6"
 # Интернет адрес архива containerd
 containerd_link: "https://github.com/containerd/containerd/releases/download/v{{ containerd_version }}/containerd-{{ containerd_version }}-linux-amd64.tar.gz"
 # Интернет адрес service файла containerd
@@ -27,7 +27,7 @@ containerd_service_link: "https://raw.githubusercontent.com/containerd/container
 # Образ используемый containerd в качестве sandbox
 containerd_sandbox_image: "registry.k8s.io/pause:3.9"
 # Используемая версия runc
-runc_version: "1.1.7"
+runc_version: "1.1.9"
 # Интернет адрес архива runc
 runc_link: "https://github.com/opencontainers/runc/releases/download/v{{ runc_version }}/runc.amd64"
 # Используемая версия CNI плагинов

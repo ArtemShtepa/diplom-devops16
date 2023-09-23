@@ -49,6 +49,30 @@
     - name: Update package cache with universal module
       ansible.builtin.package:
         update_cache: true
+    # Блок обновления всех пакетов - только для APT
+    - block:
+      # Обновление пакетов
+      - name: Upgrade all packages
+        ansible.builtin.apt:
+          upgrade: dist
+          force_apt_get: yes
+      # Проверка нужно ли перезагружать машинку после обновления ядра
+      - name: Check if a reboot is needed on all servers
+        register: reboot_required_file
+        ansible.builtin.stat:
+          path: "/var/run/reboot-required"
+          get_md5: false
+      # Перезагрузка с ожиданием ответа
+      - name: Reboot machine if kernel updated
+        reboot:
+          msg: "Reboot initiated by Ansible for kernel updates"
+          connect_timeout: 5
+          reboot_timeout: 300
+          pre_reboot_delay: 0
+          post_reboot_delay: 30
+          test_command: uptime
+        when: reboot_required_file.stat.exists
+      when: ansible_pkg_mgr == "apt"
     # Запись в файл хостов списка машин кластера
     - name: Update hosts file
       ansible.builtin.blockinfile:

@@ -1,6 +1,8 @@
 ---
 - name: Install prerequirements
   hosts: gitlab
+  vars:
+    gitlab_image: "docker.io/gitlab/gitlab-ce:{{ gitlab_version }}-ce.0"
   tasks:
     # Создание директорий, необходимых для разворачивания GitLab
     - name: Create Gitlab directories
@@ -14,16 +16,28 @@
         - "data"
         - "config"
         - "logs"
+    # Установка пакета jq
+    - name: Install JQ package
+      become: true
+      ansible.builtin.package:
+        name: "jq"
+        state: present
     # Создание конфигурационного файла GitLab
     - name: Create GitLab configuration file
       ansible.builtin.template:
         src: "gitlab.rb.jinja2"
         dest: "{{ gitlab_home }}/config/gitlab.rb"
+    # Проверка версии установленного GitLab по тегу образа
+    - name: Check version of installed GitLab
+      ansible.builtin.shell: "podman inspect gitlab | jq -r '.[] | .ImageName'"
+      ignore_errors: true
+      changed_when: false
+      register: ver_res
     # Запуск контейнера GitLab
     - name: Run Gitlab container
       containers.podman.podman_container:
         name: gitlab
-        image: "docker.io/gitlab/gitlab-ce:{{ gitlab_version }}-ce.0"
+        image: "{{ gitlab_image }}"
         state: started
         restart_policy: "always"
         generate_systemd:
@@ -73,6 +87,18 @@
           msg: "{{ cmd_res.stdout }}"
         when: cmd_res.rc == 0
       when: gitlab_backup is undefined or gitlab_backup == "" or f_name.state == "absent"
+    # Перезагрузка машинки если обновился образ GitLab
+    - name: Reboot machine
+      become: true
+      ansible.builtin.reboot:
+        post_reboot_delay: 20
+        reboot_timeout: 120
+        connect_timeout: 180
+        test_command: uptime
+      when:
+        - ver_res.stdout != gitlab_image
+        - ver_res.stdout != "null"  # Контейнер есть, но поля нет ?
+        - ver_res.stdout != ""      # Контейнер GitLab не найден
     # Ожидание готовности GitLab если будет запущено восстановление из резервной копии
     - name: Wait until GitLab is ready
       ansible.builtin.uri:

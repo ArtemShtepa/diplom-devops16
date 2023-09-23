@@ -1,6 +1,6 @@
 ---
 # Используемая версия Grafana для отображения статистики основных машин
-grafana_version: "10.0.5"
+grafana_version: "10.1.2"
 
 # Внутренний порт Grafana
 grafana_port: 3000

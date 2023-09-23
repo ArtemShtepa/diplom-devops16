@@ -10,7 +10,7 @@ runner_token: "glrt-NZYEfymt7sqf-FGjfS2N"
 runner_name: "ShellRunner"
 # --- Используется при регистрации DOCKER ---
 # Тэг образа runner с dockerhub
-runner_version: "alpine-v16.3.0"
+runner_version: "alpine-v16.4.0"
 # Используемый порт
 runner_port: 8093
 # Docker образ Runner по умолчанию

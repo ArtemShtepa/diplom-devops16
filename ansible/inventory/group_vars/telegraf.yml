@@ -1,6 +1,6 @@
 ---
 # Используемая версия Telegraf
-telegraf_version: "1.27.4"
+telegraf_version: "1.28.1"
 # Каталог расположения файлов Telegraf
 telegraf_home: "/home/{{ ansible_user }}/telegraf"
 ...
