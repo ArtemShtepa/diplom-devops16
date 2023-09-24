@@ -5,7 +5,7 @@
     terraform_version: "1.5.4"
     terraform_path: "~/.local/bin"
   tasks:
-    # Нстройка рабочей машинки на использование зеркал Яндекс.Облака
+    # Настройка рабочей машинки на использование зеркал Яндекс.Облака
     - name: Create terraform provider link to Yandex Mirror
       ansible.builtin.copy:
         dest: "~/.terraformrc"
@@ -23,7 +23,7 @@
     - name: Get latest YC CLI version
       ansible.builtin.set_fact:
         yc_ver: "{{ lookup('ansible.builtin.url', 'https://storage.yandexcloud.net/yandexcloud-yc/release/stable') }}"
-    # Прверка текущей версии утилиты с актуальной - если версии не совпадут, то вывод будет пуск
+    # Проверка текущей версии утилиты с актуальной - если версии не совпадут, то вывод будет пуск
     - name: Check YC CLI installation
       ansible.builtin.shell: "yc --version | grep {{ yc_ver }}"
       changed_when: false

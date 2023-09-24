@@ -13,7 +13,7 @@
       ignore_errors: true
       register: fp_res
     - block:
-      # Добавления хоста бастиона в список известных
+      # Добавление хоста бастиона в список известных
       - name: Add SSH Bastion fingerprint
         ansible.builtin.shell:
           ssh -o StrictHostKeyChecking=no
@@ -24,7 +24,7 @@
         retries: 6
         delay: 10
         until: res.rc == 0
-      # Запрос информации конкретной группы (pkg_mgr) по хосту 
+      # Запрос информации конкретной группы (pkg_mgr) по хосту
       - name: Detect package manager
         ansible.builtin.setup:
           gather_subset: ["pkg_mgr"]

@@ -13,7 +13,7 @@
       ansible.builtin.command: "sudo swapon --bytes --noheadings"
       register: swap_res
       changed_when: false
-    # блок отключение swap - требование kubernetes
+    # Блок отключение swap - требование kubernetes
     - name: Disabling swap
       block:
         # Отключение в real-time

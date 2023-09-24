@@ -28,16 +28,16 @@
         state: "file"
       register: rep_rest
       ignore_errors: true
-    # блок загрузки скрипта установки
+    # Блок загрузки скрипта установки
     - block:
-      # блок для пакетного менеджера APT
+      # Блок для пакетного менеджера APT
       - block:
         # Загрузка скрипта
         - name: Download installation script for DEB
           ansible.builtin.get_url:
             url: https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.deb.sh
             dest: "{{ repo_script }}"
-        # pinning - привязка - смена приоритета репозитория для пакета
+        # Pinning - привязка - смена приоритета репозитория для пакета
         - name: Apply APT pinning
           become: true
           ansible.builtin.copy:
@@ -48,7 +48,7 @@
               Pin: origin packages.gitlab.com
               Pin-Priority: 1001
         when: ansible_pkg_mgr == "apt"
-      # загрузка скрипта для пакетных менеджеров YUM и DNF
+      # Загрузка скрипта для пакетных менеджеров YUM и DNF
       - name: Download installation script for RPM
         ansible.builtin.get_url:
           url: https://packages.gitlab.com/install/repositories/runner/gitlab-runner/script.rpm.sh

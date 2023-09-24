@@ -145,14 +145,14 @@
     - name: Check grafana service exists
       ansible.builtin.set_fact:
         service_list: "{{ svc_res.stdout | from_json }}"
-    # блок применения манифестов проекта - применяется если в списке сервисов kubernetes кластера нет нужного
+    # Блок применения манифестов проекта -  выполняется если в списке сервисов kubernetes кластера нет нужного
     - block:
-      # применение манифестов серверной части
+      # Применение манифестов серверной части
       - name: Apply Kube-Prometheus server-side manifests
         ansible.builtin.command: "kubectl apply --server-side -f manifests/setup"
         args:
           chdir: "{{ kp_path }}"
-      # применение оставшихся манифестов
+      # Применение оставшихся манифестов
       - name: Apply Kube-Prometheus manifests
         ansible.builtin.command: "kubectl apply -f manifests/"
         args:

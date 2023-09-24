@@ -3,7 +3,7 @@
 - name: Add kubernetes hosts
   ansible.builtin.import_playbook: dynamic_inv.yml
 
-# play проверки существования рабочего кластера и если он есть сбрасывает его
+# Play проверки существования рабочего кластера и если он есть сбрасывает его
 - name: Check cluster presence
   hosts: kube_nodes
   tasks:
@@ -33,7 +33,7 @@
         path: "~/.kube/config"
         state: absent
 
-# PLay создания основной Master ноды kubernetes кластера
+# Play создания основной Master ноды kubernetes кластера
 - name: Create main control plane
   hosts: kube_master[0]
   become: true
@@ -75,7 +75,7 @@
         mode: 0777
       delegate_to: localhost
 
-# play первоначальной подготовки машинки, выступающей в качестве proxy для доступа к kubernetes кластеру
+# Play первоначальной подготовки машинки, выступающей в качестве proxy для доступа к kubernetes кластеру
 - name: Copy admin kube config at kube proxy
   hosts: kube_proxy
   vars:
@@ -108,7 +108,7 @@
       register: ctl_res
       until: ctl_res.rc == 0
 
-# play включения в состав kubernetes кластера оставшихся Master нод
+# Play включения в состав kubernetes кластера оставшихся Master нод
 - name: Join additional control planes
   hosts: kube_master[1:]
   vars:
@@ -119,7 +119,7 @@
       become: true
       ansible.builtin.command: "{{ join_cmd }}"
 
-# play включения в состав kubernetes кластера рабочих нод
+# Play включения в состав kubernetes кластера рабочих нод
 - name: Join worker nodes
   hosts: kube_worker
   vars:

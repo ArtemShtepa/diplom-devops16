@@ -25,7 +25,7 @@ module "vm-main-1" {
   user_key    = "../secrets/key_machine.pub"
   description = "GitLab"
   cpu         = 2
-  ram         = 4
+  ram         = 6
   cpu_load    = 5
   ip          = "192.168.1.11"
   subnet      = yandex_vpc_subnet.subnet-main
@@ -59,7 +59,7 @@ module "vm-main-3" {
   user_key    = "../secrets/key_machine.pub"
   description = "CI Runner and Kube proxy"
   cpu         = 2
-  ram         = 2
+  ram         = 1
   cpu_load    = 5
   ip          = "192.168.1.13"
   subnet      = yandex_vpc_subnet.subnet-main
