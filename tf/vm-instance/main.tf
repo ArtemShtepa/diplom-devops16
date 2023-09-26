@@ -33,7 +33,12 @@ variable "temporary" {
   type    = bool
   default = true
 }
-# Образ системного диска
+# Образ системного диска по метке
+variable "main_disk_family" {
+  type    = string
+  default = ""
+}
+# Образ системного диска по ID
 variable "main_disk_image" {
   type    = string
   default = ""
@@ -89,9 +94,10 @@ resource "yandex_compute_instance" "vm-instance" {
   boot_disk {
     device_name = var.user
     initialize_params {
-      image_id = var.main_disk_image
-      type     = "network-hdd"
-      size     = var.main_disk_size
+      image_id  = var.main_disk_image
+      family_id = var.main_disk_family
+      type      = "network-hdd"
+      size      = var.main_disk_size
     }
   }
 

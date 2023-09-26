@@ -11,8 +11,10 @@ module "vm-bastion" {
   ip          = "192.168.1.10"
   internet    = true
   subnet      = yandex_vpc_subnet.subnet-main
-  # Используется диск NAT-инстанс на основе Ubuntu 18.04
-  main_disk_image = "fd8qmbqk94q6rhb4m94t"
+  # Используется диск для NAT-инстанс
+  #main_disk_image = "fd8op8qfgnk02nflaovf" # Ubuntu 18.04, обновление 11 сентября 2023
+  #main_disk_family = "nat-instance-ubuntu" # на основе Ubuntu 18.04
+  main_disk_family = "nat-instance-ubuntu-2204" # на основе Ubuntu 22.04
   main_disk_size  = 3
 }
 
