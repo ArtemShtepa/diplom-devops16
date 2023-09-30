@@ -227,55 +227,90 @@
 
 > Для ручного запуска восстановления **GitLab** из резервной копии можно воспользоваться командой `./go.sh gl_restore`
 
-## Состав и описание используемых playbook
+## Состав и описание скриптов Ansible
 
-Для установки и настройки программ на машинках инфраструктуры используется полудинамический inventory и следующие playbook:
-- [backup_create](./ansible/playbook/backup_create.yml) - Создание резервной копии GitLab и загрузка её на рабочую машину;
-- [backup_restore](./ansible/playbook/backup_restore.yml) - Восстановление **GitLab** из резервной копии с рабочей машины;
+Для установки и настройки программ на машинках инфраструктуры используется следующие файлы Ansible
+
+### Основные playbook и подключаемые задачи [Ansible/Playbook](./ansible/playbook/)
 - [bootstrap_hosts](./ansible/playbook/bootstrap_hosts.yml) - Содержит несколько play, включая тагетированные, для настройки локальных машинок аля машинки Яндекс.Облака, обновления кэша пакетных менеджеров и установленных в системе пакетов, перезагрузка хоста если требуется и обновление списка известных хостов; Использует playbook формирования динамического inventory для опередения хостов кластера **Kubernetes**;
-- [configure_bastion](./ansible/playbook/configure_bastion.yml) - Настройка SSH бастиона;
 - [configure_yc+tf](./ansible/playbook/configure_yc+tf.yml) - Используется только для настройки рабочей машины, а именно конфигурирования окружения пользователя для использования зеркал Яндекса, установки агента **YC CLI** и **Terraform**;
 - [dynamic_inv](./ansible/playbook/dynamic_inv.yml) - Запрашивает у **YC CLI** список доступных хостов кластера **Kubernetes** текущего рабочего пространства (workspace) и на его основе формирует список хостов для inventory - формирует группы `kube_master`, `kube_worker` и `kube_nodes`;
-- [install_gitlab](./ansible/playbook/install_gitlab.yml) - Устанавливает **GitLab**, по окончании импортирует playbook восстановления из резервной копии;
-- [install_grafana](./ansible/playbook/install_grafana.yml) - Устанавливает и конфигурирует **Grafana**;
-- [install_influxdb](./ansible/playbook/install_influxdb.yml) - Устанавливает **InfluxDB**. В ходе установки ищет существующие токены доступа, если их нет, создаёт; После получения токенов доступа подготавливает готовые конфигурационные файлы для **Grafana** и **Telegraf** (настройка подключения к базе);
-- [install_kube-cluster](./ansible/playbook/install_kube-cluster.yml) - Разворачиввет кластера **Kubernetes** на соответствующих машинках используя `kudeadm`; Использует playbook динамического inventory для определения хостов кластера; При существовании кластера выполняет его сброс; Настройка осуществляется с первой Master ноды, где происходит инициализация кластера с получением команд пополнения кластера; далее подключаются остальные **Control Plane**, после чего в кластер добавляются рабочие ноды; После инициализации основной **Control Plane** применяется список предустановочных манифестов - параметр `kube_manifests` из [inventory/group_vars/kube_nodes](./ansible/inventory/group_vars/kube_nodes.yml);
-- [install_kube-finalize](./ansible/playbook/install_kube-finalize.yml) - Создаёт единый конфигурационный файл подключения к кластерам на основе нескольких (при одновременной работе обоих пространств `stage` и `prod`) и сохраняет его на proxy кластера, где расположен **GitLab runner**, который в свою очередь используя qbec смог бы подключиться к кластеру **Kubernetes**;
-- [install_kube-prereq](./ansible/playbook/install_kube-prereq.yml) - Настройка машинок в соответствии с требованиями **Kubernetes** (отключение swap и так далее), устанавливает зависимости (containerd, runc и сетевые плагины); Дополнительно на proxy кластера устанавливается `kubectl` и при необходимости `qbec` и `helm` (если версии соответствующих приложений заданы в переменных, то установка выполняется. **Helm** по умолчанию не используется), а также настраивается **HAProxy** как балансировщик запросов к приложению и мониторингу **Kube-Prometheus**;
-- [install_kube-prometheus](./ansible/playbook/install_kube-prometheus.yml) - Устанавливает на прокси кластера дистрибутив **GoLang**, исходный код проекта **Kube-Prometheus** и необходимые компоненты (jq, jsonnet-bundler), запускает сборку магифестов и применяет их на нашем кластере **Kubernetes**;
-- [install_podman](./ansible/playbook/install_podman.yml) - Устанавливает **podman**, разрешает запуск контейнеров без авторизации пользователя и перезапускает машинку;
-- [install_runner](./ansible/playbook/install_runner.yml) - Устанавливает **GitLab runner** и регистрирует его в нашем **GitLab** на основе токена из переменных inventory; Создаёт файл списка **registry** на основе файла `secrets/registry` - в нём будет содержаться список registry, куда нужно будет загружать подготовленные **Docker** образы; устанавливает для пользователя runner файлы проекта qbec из [Templates/App](./ansible/playbook/templates/app/) - это сделано для того, чтобы вручную не прописывать в проект адреса и порты кластера; Использует динамический inventory для определения хостов кластера **Kubernetes**;
-- [install_telegraf](./ansible/playbook/install_telegraf.yml) - Устанавливает **Telegraf** и настраивает экспорт метрик; при изменении конфигурационного файла перезапускает контейнер **Telegraf**;
 - [ssh_add_fp](./ansible/playbook/ssh_add_fp.yml) - Используется для настройки рабочей машины, а именно добавлению хостов проекта в список известных; Использует динамический inventory для определения хостов кластера **Kubernetes**;
 - [ssh_clear_fp](./ansible/playbook/ssh_add_fp.yml) - Используется для настройки рабочей машины, а именно удалению хостов проекта из список известных перед их уничтожением; Использует динамический inventory для определения хостов кластера **Kubernetes**;
+- [configure_bastion](./ansible/playbook/configure_bastion.yml) - Настройка SSH бастиона;
+- [install_podman](./ansible/playbook/install_podman.yml) - Устанавливает **podman**, разрешает запуск контейнеров без авторизации пользователя и перезапускает машинку;
+- [install_influxdb](./ansible/playbook/install_influxdb.yml) - Устанавливает **InfluxDB**. В ходе установки ищет существующие токены доступа, если их нет, создаёт; После получения токенов доступа подготавливает готовые конфигурационные файлы для **Grafana** и **Telegraf** (настройка подключения к базе);
+- [install_grafana](./ansible/playbook/install_grafana.yml) - Устанавливает и конфигурирует **Grafana**;
+- [install_telegraf](./ansible/playbook/install_telegraf.yml) - Устанавливает **Telegraf** и настраивает экспорт метрик; при изменении конфигурационного файла перезапускает контейнер **Telegraf**;
+- [install_gitlab](./ansible/playbook/install_gitlab.yml) - Устанавливает **GitLab**, по окончании импортирует playbook восстановления из резервной копии;
+- [install_runner](./ansible/playbook/install_runner.yml) - Устанавливает **GitLab runner** и регистрирует его в нашем **GitLab** на основе токена из переменных inventory; Создаёт файл списка **registry** на основе файла `secrets/registry` - в нём будет содержаться список registry, куда нужно будет загружать подготовленные **Docker** образы; устанавливает для пользователя runner файлы проекта qbec из [Templates/App](./ansible/playbook/templates/app/) - это сделано для того, чтобы вручную не прописывать в проект адреса и порты кластера; Так как в шаблонах не мало файлов в playbook используется модуль поиска файлов и каталогов, поэтому файлы с оригинальным расширением; Используется динамический inventory для определения хостов кластера **Kubernetes**;
+- [backup_create](./ansible/playbook/backup_create.yml) - Создание резервной копии GitLab и загрузка её на рабочую машину;
+- [backup_restore](./ansible/playbook/backup_restore.yml) - Восстановление **GitLab** из резервной копии с рабочей машины;
+- [install_kube-prereq](./ansible/playbook/install_kube-prereq.yml) - Настройка машинок в соответствии с требованиями **Kubernetes** (отключение swap и так далее), устанавливает зависимости (containerd, runc и сетевые плагины); Дополнительно на proxy кластера устанавливается `kubectl` и при необходимости `qbec` и `helm` (если версии соответствующих приложений заданы в переменных, то установка выполняется. **Helm** по умолчанию не используется), а также настраивается **HAProxy** как балансировщик запросов к приложению и мониторингу **Kube-Prometheus**;
+- [install_kube-cluster](./ansible/playbook/install_kube-cluster.yml) - Разворачиввет кластера **Kubernetes** на соответствующих машинках используя `kudeadm`; Использует playbook динамического inventory для определения хостов кластера; При существовании кластера выполняет его сброс; Настройка осуществляется с первой Master ноды, где происходит инициализация кластера с получением команд пополнения кластера; далее подключаются остальные **Control Plane**, после чего в кластер добавляются рабочие ноды; После инициализации основной **Control Plane** применяется список предустановочных манифестов - параметр `kube_manifests` из [inventory/group_vars/kube_nodes](./ansible/inventory/group_vars/kube_nodes.yml);
+- [install_kube-finalize](./ansible/playbook/install_kube-finalize.yml) - Создаёт единый конфигурационный файл подключения к кластерам на основе нескольких (при одновременной работе обоих пространств `stage` и `prod`) и сохраняет его на proxy кластера, где расположен **GitLab runner**, который в свою очередь используя qbec смог бы подключиться к кластеру **Kubernetes**;
+- [install_kube-prometheus](./ansible/playbook/install_kube-prometheus.yml) - Устанавливает на прокси кластера дистрибутив **GoLang**, исходный код проекта **Kube-Prometheus** и необходимые компоненты (jq, jsonnet-bundler), запускает сборку магифестов и применяет их на нашем кластере **Kubernetes**;
 - [tasks_containerd](./ansible/playbook/tasks_containerd.yml) - Набор задач (tasks) для установки **containerd** и его зависимостей;
+- [tasks_kube-tools](./ansible/playbook/tasks_kube-tools.yml) - Набор задач (tasks) для настройки в системе репозиториев **Kubernetes** и устаановки из них утилит `kubeadm`, `kubelet` и `kubectl` заданной версии;
 - [tasks_go-installer](./ansible/playbook/tasks_go-install.yml) - Набор задач (tasks) для установки приложения-компонента Go; Блок вынесен в отдельный файл, для того, чтобы можно было его использовать при в цикле **loop**;
 - [tasks_helm](./ansible/playbook/tasks_helm.yml) - Набор задач (tasks) для установки **Helm**;
-- [tasks_kube-tools](./ansible/playbook/tasks_kube-tools.yml) - Набор задач (tasks) для настройки в системе репозиториев **Kubernetes** и устаановки из них утилит `kubeadm`, `kubelet` и `kubectl` заданной версии;
 - [tasks_qbec](./ansible/playbook/tasks_qbec.yml) - Набор задач (tasks) для установки **qbec**;
-  
+> Описание этапов смотрите в комментариях к соответствующим playbook
+
+### Файлы описания хостов и состава групп [Ansible/Inventory](./ansible/inventory/)
 - [hosts](./ansible/inventory/hosts.yml) - Основной inventory: Содержит список групп и хостов, включая SSH бастион, переменные портов, используемых приложением и файлы ключей для подключения по SSH; IP адрес, порт и пользователь бастиона берётся из переменных inventory, которые в свою очередь читаются из переменных окружения;
-- [kube_nodes](./ansible/inventory/kube_nodes.yml) - Загрушка, создающая одну группу из двух: `node_master`` и `node_worker``;
 - [podman](./ansible/inventory/podman.yml) - Загрушка, создающая группу хостов, где необходимо установить podman - включает группы `gitlab`, `runner, `grafana, `influxdb` и `telegraf`;
+- [kube_nodes](./ansible/inventory/kube_nodes.yml) - Загрушка, создающая одну группу из двух: `node_master`` и `node_worker``;
 
+### Файлы переменных [Ansible/Inventory/Group_Vars](./ansible/inventory/group_vars/)
 - [all](./ansible/inventory/group_vars/all.yml) - Основные переменные, содержащие в основном данные о SSH бастионе - какой испольузется IP адрес, порт, пользователь, для каких хостов какие ключи и номера портов для доступа к интерфейсам **GitLab**, **Git**, **InfluxDB**, **Grafana** (основная и кластера), статистики **HAProxy** (основная и proxy кластера), порты приложения в разных рабочих пространствах, а также логин и пароль доступа к статистике **HAProxy**;
-- [gitlab](./ansible/inventory/group_vars/gitlab.yml) - Версия **GitLab** и другие мене интересные параметры; проект написан с учётом возможности обновления версии **GitLab** - для этого нужно изменить переменную версии (только в сторону увеличения) и выполнить команду `./go.sh i_gitlab`;
-- [grafana](./ansible/inventory/group_vars/grafana.yml) - Версия **Grafana**, логин и пароль администратора по умолчанию, логин и пароль создаваемого пользователя и другие параметры;
 - [influxdb](./ansible/inventory/group_vars/influxdb.yml) - Версия **InfluxDB**, логин и пароль администратора по умолчанию, название организации, имя бакета и другие параметры;
-- [kube_nodes](./ansible/inventory/group_vars/kube_nodes.yml) - Версия **Kubernetes**, список предустанавливаемых манифестов, диапазон сетевых адресов машин кластера, порт API сервера, версии и адреса загрузки компонетов;
-- [runner](./ansible/inventory/group_vars/runner.yml) - Токен регистрации runner, имя runner в системе (влияет на идентификацию в playbook) и другие параметры;
+- [grafana](./ansible/inventory/group_vars/grafana.yml) - Версия **Grafana**, логин и пароль администратора по умолчанию, логин и пароль создаваемого пользователя и другие параметры;
 - [telegraf](./ansible/inventory/group_vars/telegraf.yml) - Версия **Telegraf** и путь расположения;
+- [gitlab](./ansible/inventory/group_vars/gitlab.yml) - Версия **GitLab** и другие мене интересные параметры; проект написан с учётом возможности обновления версии **GitLab** - для этого нужно изменить переменную версии (только в сторону увеличения) и выполнить команду `./go.sh i_gitlab`;
+- [runner](./ansible/inventory/group_vars/runner.yml) - Токен регистрации runner, имя runner в системе (влияет на идентификацию в playbook) и другие параметры;
+- [kube_nodes](./ansible/inventory/group_vars/kube_nodes.yml) - Версия **Kubernetes**, список предустанавливаемых манифестов, диапазон сетевых адресов машин кластера, порт API сервера, версии и адреса загрузки компонетов;
+> Подробное описание всех переменных смотрите в комментариях соответствующих файлов
 
-TEMPLATES
+### Файлы шаблонов: [Ansible/Playbooks/Templates](./ansible/playbook/templates/)
+- [app](./ansible/playbook/templates/app/) - Каталог проекта разворачивания (deploy) приложения в кластере **Kubernetes**; В шаблоне подставляется IP адрес proxy кластера **Kubernetes** и порт его API сервера в соответствующем рабочем пространстве;
+- [haproxy_bastion.cfg.jinja2](./ansible/playbook/templates/haproxy_bastion.cfg.jinja2) - Шаблон файла настроек **HAProxy** SSH бастиона; Генерируются все записи **frontend** (что из приходящего принимаем) и **backend** (куда направляем);
+- [haproxy_kubeapi.cfg.jinja2](./ansible/playbook/templates/haproxy_kubeapi.cfg.jinja2) - Шаблон файла настроек **HAProxy** proxy кластера **Kubernetes**; Также генерируются все записи **frontend** и **backend**; По сути является балансировщиком нагрузки (распределяет запросы по доступным управляющим нодам);
+- [telegraf.conf.jinja2](./ansible/playbook/templates/telegraf.conf.jinja2) - Шаблон конфигурационного файла **Telegraf**; Помимо параметризируемого источника вывода (настройки подключения к СУБД **InfluxDB**) преднастроены собираемые метрики; На основе шаблона генерируется готовый конфигйрационный файл, сохраняемый под именем `_telegraf.conf` в каталог файлов;
+- [grafana.ini.jinja2](./ansible/playbook/templates/grafana.ini.jinja2) - Шаблон конфигурационного файла **Grafana** основной группы машинок; Параметризируется логин и пароль администратора по умолчанию;
+- [grafana-ds-influxdb.yml.jinja2](./ansible/playbook/templates/grafana-ds-influxdb.yml.jinja2) - Шаблон конфигурационного файл системы **Grafana active provisioning**, позволяющей в автоматическом режиме произвести настройку источника данных, в данном случае СУБД **InfluxDB**, развёрнутую на одной из машинок; На основе шаблона генерируется готовый конфигйрационный файл, сохраняемый под именем `_grafana-ds-influxdb.yml` в каталог файлов;
+- [gitlab.rb.jinja2](./ansible/playbook/templates/gitlab.rb.jinja2) - Шаблон конфигурационного файл **GitLab**; В основном предназначен для задаётся парамтер внешнего url **GitLab**, на основе которого система генерирует большинство ссылок web интерфейса - в качестве значения используется IP адрес бастиона и отведённый для **GitLab** порт; В угоду сокращению потребления оперативной памяти сокращено число активный рабочих потоков, скорректированы некоторые другие параметры;
+- [registry_list.jinja2](./ansible/playbook/templates/registry_list.jinja2) - Шаблон файла со списком **registry**, куда будут загружаться Docker образы; Формируется на основе списка из файла `secrets/registry`; Используется в CI/CD при сборке приложения;
+- [grafana-kube.service.jinja2](./ansible/playbook/templates/grafana-kube.service.jinja2) - Шаблон сервисного файла, запускающего проброс порта сервиса **Grafana** из кластера **Kubernetes** стэка **Kube-Prometheus**;
 
-FILES
-  
-## Приложение
+### Готовые файлы [Ansible/Playbook/Files](./ansible/playbook/files/)
+- [grafana-db-home.json](./ansible/playbook/files/grafana-db-home.json) - Файл системы **Grafana active provisioning**, позволяющей в автоматическом режиме произвести настройку начальной страницы **Grafana**;
+- [grafana-db-hosts.json](./ansible/playbook/files/grafana-db-home.json) - Файл экспорта настроенной доски (dashboard) отображения основных метрик машин, с которых **Telegraf** собираем метрики (`vm-1`, `vm-2` и `vm-3`);
+- [grafana-db-hosts.yml](./ansible/playbook/files/grafana-db-home.yml) - Файл системы **Grafana active provisioning**, позволяющей в автоматическом режиме произвести настройку **dashboard**, в даннном случае доску `hosts`;
+- `_telegraf.conf` - Готовый конфигурационный файл **Telegraf**; Является генерируемым, может быть удалён;
+- `_grafana-ds-influxdb.yml` - Готовый файл настройки источника данных для **Grafana**; Является генерируемым, может быть удалён;
+- `_kube_admin.conf` - Временный файл с полными правами доступа к кластеру **Kubernetes**, загружаемый из основной **Control Plane**;
+- `_kube_join_controlplane` - Временный файл команды подключения к кластеру **Kubernetes** дополнительных **Control Plane**;
+- `_kube_join_worker` - Временный файл команды подключения к кластеру **Kubernetes** рабьочих нод;
+- `_gitlab_<версия>_backup.tar` - Файлы резервных копий **GitLab**, где вместо `<версия>` указывается версия **GitLab** с которой создана копия; Используется для сохранения и восстановления состояния **GitLab**, например, при пересоздании инфраструктуры;
+
+### Файлы проекта [QBEC](./ansible/playbook/templates/app/)
+- [qbec.yaml](./ansible/playbook/templates/app/qbec.yaml) - Основной файл проекта **qbec**; Содержим имя проета и используемые прастранства имён: `stage` и `prod` с настройками подключения к соответствующему кластеру **Kubernetes** (в проекте используется один);
+- [params.libsonnet](./ansible/playbook/templates/app/params.libsonnet) - Стандартный файл **qbec** используемый без модификации - подключает внешние файлы окружений из каталога `environments`;
+- [base.libsonnet](./ansible/playbook/templates/app/environments/base.libsonnet) - Базовые настройки для всех окружений;
+- [environments/stage.libsonnet](./ansible/playbook/templates/app/environments/stage.libsonnet) - Уникальные настройки окружения `stage` (Главное отличие - использование 4 реплик приложения);
+- [environments/prod.libsonnet](./ansible/playbook/templates/app/environments/prod.libsonnet) - Уникальные настройки окружения `prod` (Главное отличие - использование 6 реплик приложения и ограничение использования ресурсов);
+- [components/namespace.jsonnet](./ansible/playbook/templates/app/components/namespace.jsonnet) - Создание в кластере **Kubernetes** пространства имён, идентичного названию окружения;
+- [components/frontend.jsonnet](./ansible/playbook/templates/app/components/frontend.jsonnet) - Создание в кластере **Kubernetes** deploy приложения и сервиса доступа к нему;
+
+## Приложение [API Server](./app_project/)
 
 Простейший API сервер на языке **GoLang**, обрабатывающий HTTP запросы:
-  - По **url** `/task/<id>` выводит в лог число `<id>`. В ответном JSON блоке результат преобразования `<id>` в число
-  - По **url** `/wait` замораживает выполнение приложения от 1 до 5 секунд. В ответном JSON блоке включается время начала и окончания заморозки в формате ISO и Unix Timestamp
-  - На остальные **url** в ответный JSON блок включается путь и HTTP метод запроса
+- По **url** `/uuid` - выводит информации по текущему экземпляру сервера. В ответном JSON блоке содержатся поля `Version` текущей версия прилоежния и `UUId` со значением уникального идентификатора экземпляра;
+- По **url** `/ip` - выводит информацию о доступных приложению IP адресов. В ответном JSON блоке только списка IP адресов;
+- По **url** `/task/<id>` выводит в лог число `<id>`. В ответном JSON блоке результат преобразования `<id>` в число
+- По **url** `/wait` замораживает выполнение приложения от 1 до 5 секунд. В ответном JSON блоке включается время начала и окончания заморозки в формате ISO и Unix Timestamp
+- На остальные **url** в ответный JSON блок включается путь и HTTP метод запроса
 
 Приложение, по умолчанию, принимает соединения со всех адресов по порту **8080** (`0.0.0.0:8080`).
 
@@ -283,10 +318,38 @@ FILES
 параметром запуска `-addr` (например, `apiserver --addr 127.0.0.1:80`),
 либо переменной окружения `API_BIND` (например, `export API_BIND=:8090`)
 
-[Исходный код](./app_source/apiserver.go)
+Исходный код представлен в единственном файле: [apiserver.go](./app_project/src/apiserver.go)
+
+Для проверки функционирования приложения в рамках кластера реализована идентификация каждого конкретного экземпляра уникальным UUID, который генерируется при старте приложения и не меняется до его завершения. Генерирование UUID выполняется внешним пакетом `github.com/google/uuid`, поэтому требуется инициализация **GoLang** проекта (`go mod init`) с генерированием файла зависимостей (`go mod tidy`) - пример использования приведён ниже.
+
+Пример `Dockerfile` для сборки приложения по исходному коду:
+```dockerfile
+FROM docker.io/golang:alpine AS compile-image
+WORKDIR /src
+ADD src/apiserver.go __version__ ./
+RUN go mod init apiserver && go mod tidy && go build -ldflags="-X 'main.Version=$(cat __version__)'"
+
+FROM docker.io/alpine
+RUN apk --no-cache add curl
+COPY --from=compile-image /src/apiserver /apiserver
+ENTRYPOINT ["/apiserver"]
+```
+
+Компиляция приложения осуществляется в **podman** контейнере на основе docker образа [docker.io/golang](https://hub.docker.com/_/golang) средствами **GitLab CI**. Исполняемый файл упаковывается в docker образ на основе [docker.io/alpine](https://hub.docker.com/_/alpine) также средствами **GitLab CI** либо и спользованием артефактов по [Dockerfile-art](./app_project/Dockerfile-art), либо по исходному коду по [Dockerfile-full](./app_project/Dockerfile-full); В проекте использование сборки образа по исходному коду закомментировано и не используется, оставлено в качестве примера.
 
 ## Сборка и доставка приложения
 
+Компиляция приложения, сборка готового docker образа, разрованивания в кластере **Kubernetes** и удаление из него может быть выполнено исключительно в интерфейсе **GitLab**, для чего разработан план сборки (pipeline), представленный в файле [.gitlab-ci.yml](./app_project/.gitlab-ci.yml).
+
+В плане сборки используются следующие этапы:
+1. Компиляция (`compile`)
+1. Сборки docker образа (`build`), включая выгрузку на **DockerHub**
+1. Разворачивание в кластере **Kubernetes** (`deploy`)
+1. Удаление из кластера **Kubernetes** (`clean`)
+
+Для каждого из окружений `stage` и `prod` реализованы отдельные шаги.
+
+![Сборочная линия при Tag Commiting](./img/tag_pipeline.png)
 
 ## Справочные материалы
 

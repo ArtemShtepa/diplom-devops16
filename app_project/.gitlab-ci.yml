@@ -1,39 +1,57 @@
+# Список этапов
 stages:
   - compile
   - build
   - deploy
   - clean
 
+# Используемые переменные
 variables:
+  # Переменная, указывающая какой Dockerfile использовать для сборки образа
   #DFILE: "full"
   DFILE: "art"
+  # Переменная названия окружения, значение по умолчанию
   CLUSTER_ENV: "stage"
+  # Константа получения описания сборки - либо тэг, либо тэг, дополненный сборкой
   VERSION_CMD: "git describe --always --tags"
 
+# Шаг компиляции приложения
 Compile:
+  # Этап, к которому относится данный шаг
   stage: compile
   #only:
   #  changes:
   #    - "**/*.go"
+  # Переменные шага
   variables:
-  #  DFILE: "art"
+    #DFILE: "art"
+    # Указание использовать чистый репозиторий (склонировать заново), вместо кэша (fetch)
     GIT_STRATEGY: clone
+  # Тэги по которым выбирается Runner
   tags:
     - linux
     - podman
+  # Команды выполняемые Runner
   script:
     - $VERSION_CMD > __version__
     - echo "Compiling application v$(cat __version__)..."
     - podman run --rm -v ./src:/src docker.io/golang:alpine sh -c "cd /src && go mod init apiserver && go mod tidy && go build -ldflags=\"-X 'main.Version=$(cat __version__)'\""
+  # Указание на сохранение артефактов - исполяемого файла приложения
   artifacts:
     paths:
       - src/apiserver
 
+# Шаг сборки образа с приложением - этап build
 Build image:
   stage: build
+  # Условия запуска шага - при условии успешного выполнения предыдущего
   when: on_success
+  # Что требуется для запуска шага - по умолчанию, завершение предыдущего шага
+  # Данным блоком можно изменить последовательность выполнения шагов
   needs:
     - Compile
+  # Указания, артефакты каких шагов нужно выгружать.
+  # По умолчанию, выгружаются все предыдущие.
   dependencies:
     - Compile
   tags:
@@ -43,8 +61,10 @@ Build image:
     - $VERSION_CMD > __version__
     - bash build.sh --build-$DFILE
 
+# Шаг выгрузки образа во внешний Registry этапа build
 Push image:
   stage: build
+  # Условие запуска шага - требуется ручной запуск
   when: manual
   needs:
     - Build image
@@ -56,6 +76,7 @@ Push image:
     - bash build.sh --push
     - podman logout --all
 
+# Шаг разворачивания приложения в кластере Kubernetes этапа deploy в окружении stage
 Deploy STAGE:
   stage: deploy
   when: on_success
@@ -67,13 +88,17 @@ Deploy STAGE:
     - echo "Deploying application v$APP_IMAGE_TAG for $CLUSTER_ENV..."
     - bash build.sh --deploy
 
+# Шаг разворачивания приложения в кластере Kubernetes этапа deploy в окружении prod
 Deploy PROD:
   stage: deploy
   when: manual
   needs:
     - Push image
+  # Условия необходимости выполнения шага
   rules:
+    # Если существует переменная CI_COMMIT_TAG (доступна только в типе события Tag Commiting) и она удовлетворяет шаблону регулярного выражения
     - if: $CI_COMMIT_TAG =~ /^[0-9]+\.[0-9]+(\.[0-9]+|)$/
+      # Для шага меняются значения переменных
       variables:
         CLUSTER_ENV: "prod"
         APP_IMAGE_TAG: $CI_COMMIT_TAG
@@ -82,6 +107,7 @@ Deploy PROD:
     - echo "Deploying application v$APP_IMAGE_TAG for $CLUSTER_ENV..."
     - bash build.sh --deploy
 
+# Шаг удаления приложения из кластера Kubernetes для окружения stage
 Clean STAGE:
   stage: clean
   when: manual
@@ -93,6 +119,7 @@ Clean STAGE:
     - echo "Destroy application v$APP_IMAGE_TAG at $CLUSTER_ENV..."
     - bash build.sh --clean
 
+# Шаг удаления приложения из кластера Kubernetes для окружения prod
 Clean PROD:
   stage: clean
   when: manual
