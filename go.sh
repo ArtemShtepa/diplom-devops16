@@ -169,11 +169,16 @@ check_bastion() {
 # Инициализация Terraform
 tf_init() {
   cd $terraform_dir
-  terraform init -reconfigure -backend-config="access_key=$access_key" -backend-config="secret_key=$secret_key" -backend-config="bucket=$storage_name"
+  if [ "$1" = "re" ]; then
+    terraform init -reconfigure -backend-config="access_key=$access_key" -backend-config="secret_key=$secret_key" -backend-config="bucket=$storage_name"
+  else
+    terraform init -backend-config="access_key=$access_key" -backend-config="secret_key=$secret_key" -backend-config="bucket=$storage_name"
+  fi
   #terraform providers lock -platform=linux_amd64
   # Создание рабочих пространств
   terraform workspace new stage
   terraform workspace new prod
+  # Выбор рабочего пространства
   terraform workspace select prod
 }
 
@@ -312,6 +317,15 @@ run_vm() {
   fi
 }
 
+interrupt() {
+  for n in $($vm_list_cmd | jq -r '.[] | select(.scheduling_policy.preemptible==true) | .name'); do
+    echo -e "$C10 Stopping: $C13$n $CR..."
+    if ! [ "$is_local_vm" = true ]; then
+      yc compute instance stop --async $n
+    fi
+  done
+}
+
 # Функция запуска остановленных машин в Яндекс.Облаке
 rearm() {
   for n in $($vm_list_cmd | jq -r '.[] | select(.status != "RUNNING") | .name'); do
@@ -319,12 +333,15 @@ rearm() {
     if ! [ "$is_local_vm" = true ]; then
       yc compute instance start $n
     fi
-    if [[ $n =~ [*bastion] ]]; then
+    if [[ $n =~ ^.*bastion$ ]]; then
       check_bastion
       cd $ansible_dir
       ansible-playbook -i inventory --tags bastion playbook/ssh_add_fp.yml
     fi
   done
+  if [ "$is_local_vm" = false ]; then
+    yc compute instance list
+  fi
 }
 
 # Функция вывода версий используемого ПО
@@ -352,7 +369,7 @@ else
   echo -e "$C15 Possible commands:"
   echo -e "$C7  versions     $C7- Print used programm versions"
   echo -e "$C15  init         $C7- Install Ansible,YC CLI,Terraform and preconfigure YC"
-  echo -e "$C13  tf_init      $C7- Run Terraform init"
+  echo -e "$C13  tf_init      $C7- Run Terraform init $C8(Use 're' option to reconfigure)"
   echo -e "$C5  tf_plan      $C7- Print Terraform plan"
   echo -e "$C13  tf_apply     $C7- Apply Terraform plan"
   echo -e "$C12  tf_destroy   $C7- Destroy Terraform plan"
@@ -374,6 +391,7 @@ else
   echo -e "$C8                 ( Create cumulative Kubernetes config file )"
   echo -e "$C11  i_kube_mon   $C7- Build and apply Kube-Prometheus manifests"
   echo -e "$C5  run_vm       $C7- Run SSH session or command on remote machine"
+  echo -e "$C13  interrupt    $C7- Stop interruptible YC instances"
   echo -e "$C13  rearm        $C7- Start stopped YC instances"
   echo -e "$C12  clean        $C7- Destroy preconfigured YC resources and clear temporary files"
   echo -e "$C2                 $C14* Steps require podman installed$CR"
