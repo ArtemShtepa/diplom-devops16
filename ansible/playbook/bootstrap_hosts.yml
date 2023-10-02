@@ -18,11 +18,11 @@
   tasks:
     # Запоминание имени пользователя в переменную
     - name: Save user name
-      set_fact:
+      ansible.builtin.set_fact:
         remote_user: "{{ ansible_user }}"
     # Исзменение пользователя в параметрах подключения Ansible на root
     - name: Change SSH user
-      set_fact:
+      ansible.builtin.set_fact:
         ansible_user: root
     # Установка пакета sudo на целевой машине
     - name: Install sudo to allow become
@@ -45,6 +45,18 @@
   hosts: all
   become: true
   tasks:
+    # Запись в файл хостов списка машин кластера
+    - name: Update hosts file
+      ansible.builtin.blockinfile:
+        dest: "{{ item }}"
+        block: |
+          {% for item in groups['all'] %}
+          {{ hostvars[item]['ansible_host'] }} {{ item }}
+          {% endfor %}
+        state: present
+      loop:
+        - "/etc/hosts"
+        - "/etc/cloud/templates/hosts.debian.tmpl"
     # Обновление кэша пакетного менеджера
     - name: Update package cache with universal module
       ansible.builtin.package:
@@ -66,20 +78,11 @@
       - name: Reboot machine if kernel updated
         reboot:
           msg: "Reboot initiated by Ansible for kernel updates"
-          connect_timeout: 5
-          reboot_timeout: 300
-          pre_reboot_delay: 0
-          post_reboot_delay: 30
+          connect_timeout: 180
+          reboot_timeout: 120
+          pre_reboot_delay: 10
+          post_reboot_delay: 20
           test_command: uptime
         when: reboot_required_file.stat.exists
       when: ansible_pkg_mgr == "apt"
-    # Запись в файл хостов списка машин кластера
-    - name: Update hosts file
-      ansible.builtin.blockinfile:
-        dest: /etc/hosts
-        block: |
-          {% for item in groups['all'] %}
-          {{ hostvars[item]['ansible_host'] }} {{ item }}
-          {% endfor %}
-        state: present
 ...

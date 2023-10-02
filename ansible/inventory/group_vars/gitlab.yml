@@ -1,6 +1,6 @@
 ---
 # Используемая версия GitLab
-gitlab_version: "16.4.0"
+gitlab_version: "16.4.1"
 # Каталог размещения файлов GitLab
 gitlab_home: "/home/{{ ansible_user }}/gitlab"
 

@@ -10,7 +10,7 @@
   tasks:
     # Проверка состояния swap
     - name: Check swap settings
-      ansible.builtin.command: "sudo swapon --bytes --noheadings"
+      ansible.builtin.command: "swapon --bytes --noheadings"
       register: swap_res
       changed_when: false
     # Блок отключение swap - требование kubernetes
@@ -30,12 +30,15 @@
     # Установка соотвествия имени хостов кластера его IP адресам
     - name: Update host names
       ansible.builtin.blockinfile:
-        path: "/etc/hosts"
+        path: "{{ item }}"
         create: true
         block: |
-          {% for item in groups['kube_nodes'] %}
+          {% for item in groups['all'] %}
           {{ hostvars[item]['ansible_host'] }} {{ item }}
           {% endfor %}
+      loop:
+        - "/etc/hosts"
+        - "/etc/cloud/templates/hosts.debian.tmpl"
 
 # Устновка пакетов необходимых для работы kubernetes кластера
 - name: Install prerequirements

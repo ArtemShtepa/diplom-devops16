@@ -15,6 +15,32 @@
         owner: "{{ ansible_user }}"
         group: "{{ ansible_user }}"
 
+# Конфигурирование маршрутов для runner с внешнего IP на локальный
+- name: Update host route configuration
+  hosts: runner
+  become: true
+  tasks:
+    # Разрешение IP Forward для перенаправления трафика с внешнего IP на локальный
+    - name: Configure core modules
+      ansible.posix.sysctl:
+        name: "net.ipv4.ip_forward"
+        value: "1"
+        reload: true
+        state: present
+    # Установка пакета необходимого для фиксации маршрута как постоянного
+    - name: Install iptables-persistent
+      ansible.builtin.package:
+        name: "iptables-persistent"
+        state: present
+    # Создание статического маршрута на GitLab с внешнего IP бастиона на локальный
+    - name: Create route to GitLab
+      ansible.builtin.command: "iptables -t nat -A OUTPUT -d {{ bastion_host }} -p tcp --dport {{ bastion_gitlab }} -j DNAT --to-destination {{ hostvars[groups.gitlab.0].ansible_host }}:{{ hostvars[groups.gitlab.0].gitlab_port }}"
+      changed_when: false
+    # Сохранение текущих маршрутов как постоянных
+    - name: Save routes to persistent config
+      ansible.builtin.shell: "iptables-save > /etc/iptables/rules.v4"
+      changed_when: false
+
 # Установка Runner прямо в систему и регистрация как SHELL
 - name: Install GitLab Runner AS shell executor
   hosts: runner
@@ -94,7 +120,7 @@
           gitlab-runner register
           --non-interactive
           --name "{{ runner_name }}"
-          --url "http://{{ bastion_host }}:8000"
+          --url "http://{{ bastion_host }}:{{ bastion_gitlab }}"
           --token "{{ runner_token }}"
           --executor "shell"
       when: runner_list | length == 0
@@ -117,7 +143,7 @@
         --volume {{ runner_home }}:/etc/gitlab-runner
         docker.io/gitlab/gitlab-runner:{{ runner_version }}
         register --non-interactive
-        --url "http://{{ bastion_host }}:8000"
+        --url "http://{{ bastion_host }}:{{ bastion_gitlab }}"
         --token "{{ runner_token }}"
         --executor "docker"
         --docker-privileged=true
@@ -147,10 +173,9 @@
         scope: user
         enabled: true
 
-# Создание файла списка registry
+# Конфигурирование маршрутов для runner с внешнего IP на локальный
 - name: Update registry list
   hosts: runner
-  tags: registry
   become: true
   vars:
     reg_cdt: "{{ lookup('file', '../../secrets/registry') | from_json }}"

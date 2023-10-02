@@ -13,7 +13,7 @@ sa_name="sa-diplom"
 # Дополнение к имени файла сервисного аккаунта
 sa_file="diplom"
 # Флаг отладки на локальных виртуальных машинах
-is_local_vm=true
+is_local_vm=false
 
 # Цветовая палитра DOS
 CR='\e[0m'
@@ -162,7 +162,7 @@ check_bastion() {
     echo -e "$C12 SSH Bastion does not exist or is not configured as NAT$CR"
     exit 1
   else
-    echo -e "$C15 Use SSH Bastion at $C14$BASTION_USER$C6:$C14$BASTION_IP$CR";
+    echo -e "$C15 Use SSH Bastion at $C14$BASTION_USER$C6@$C14$BASTION_IP$CR";
   fi
 }
 
@@ -174,7 +174,7 @@ tf_init() {
   # Создание рабочих пространств
   terraform workspace new stage
   terraform workspace new prod
-  terraform workspace select stage
+  terraform workspace select prod
 }
 
 # Функция запуска команд Terraform

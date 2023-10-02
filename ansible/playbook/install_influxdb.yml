@@ -42,6 +42,9 @@
         - 'cmd_res.rc != 0'
         - '"has already been set up" not in cmd_res.stderr'
       changed_when: cmd_res.rc == 0
+      retries: 20
+      delay: 6
+      until: cmd_res.rc == 0 or "has already been set up" in cmd_res.stderr
     # Получение идентификатора bucket
     - name: Get bucket ID from CLI
       ansible.builtin.command: >-

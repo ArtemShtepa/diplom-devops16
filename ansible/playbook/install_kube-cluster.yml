@@ -32,6 +32,14 @@
       ansible.builtin.file:
         path: "~/.kube/config"
         state: absent
+    # Перезагрузка машинок
+    - name: Reboot machine
+      become: true
+      ansible.builtin.reboot:
+        post_reboot_delay: 20
+        reboot_timeout: 120
+        connect_timeout: 180
+        test_command: uptime
 
 # Play создания основной Master ноды kubernetes кластера
 - name: Create main control plane
@@ -118,6 +126,10 @@
     - name: Initialize join
       become: true
       ansible.builtin.command: "{{ join_cmd }}"
+      register: join_res
+      retries: 10
+      delay: 6
+      until: join_res.rc == 0
 
 # Play включения в состав kubernetes кластера рабочих нод
 - name: Join worker nodes
@@ -129,4 +141,8 @@
     - name: Initialize join
       become: true
       ansible.builtin.command: "{{ join_cmd }}"
+      register: join_res
+      retries: 10
+      delay: 6
+      until: join_res.rc == 0
 ...

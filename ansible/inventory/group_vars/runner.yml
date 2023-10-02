@@ -3,7 +3,7 @@
 # Каталог файлов runner
 runner_home: "/home/{{ ansible_user }}/gitlab-runner"
 # Ключ регистрации runner - получается при первичной настройке Runner в интерфейсе GitLab
-runner_token: "glrt-NZYEfymt7sqf-FGjfS2N"
+runner_token: "glrt-Tv3hfsXBQBDLxPuoYH1i"
 
 # --- Используется при регистрации SHELL ---
 # Название Runner
