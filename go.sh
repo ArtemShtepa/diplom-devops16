@@ -331,7 +331,11 @@ rearm() {
   for n in $($vm_list_cmd | jq -r '.[] | select(.status != "RUNNING") | .name'); do
     echo -e "$C14 Rearm instance: $C13$n $CR..."
     if ! [ "$is_local_vm" = true ]; then
-      yc compute instance start $n
+      if [[ $n =~ ^.*bastion$ ]]; then
+        yc compute instance start $n
+      else
+        yc compute instance start --async $n
+      fi
     fi
     if [[ $n =~ ^.*bastion$ ]]; then
       check_bastion
