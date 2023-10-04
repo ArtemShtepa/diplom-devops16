@@ -2936,18 +2936,20 @@ sa@ubuntu22:~/api-server$ for ((;;)); do curl http://130.193.50.242:8033/uuid; e
 sa@ubuntu22:~/api-server$
 ```
 
-## Доступные для контроля ресурсы
+## Доступные для контроля ресурсы (выключены)
 
-- Система контроля версий - [GitLab](http://130.193.50.242:8000)
-- СУБД временных рядов - [InfluxDB](http://130.193.50.242:8010)
-- Метрики основных машинок - [Grafana основная](http://130.193.50.242:8011)
-- Метрики калстера **Kubernetes** - [Grafana кластера](http://130.193.50.242:8012)
-- Статистика бастиона - [HAProxy бастиона](http://130.193.50.242:8020)
+- Система контроля версий - ~~[GitLab](http://130.193.50.242:8000)~~
+- СУБД временных рядов - ~~[InfluxDB](http://130.193.50.242:8010)~~
+- Метрики основных машинок - ~~[Grafana основная](http://130.193.50.242:8011)~~
+- Метрики калстера **Kubernetes** - ~~[Grafana кластера](http://130.193.50.242:8012)~~
+- Статистика бастиона - ~~[HAProxy бастиона](http://130.193.50.242:8020)~~
   - Логин: **root**, пароль: **haproxy**
-- Статистика proxy кластера **Kubernets** - [HAProxy proxy](http://130.193.50.242:8021)
+- Статистика proxy кластера **Kubernets** - ~~[HAProxy proxy](http://130.193.50.242:8021)~~
   - Логин: **root**, пароль: **haproxy**
-- Приложение в окружении `Stage` - [API Server](http://130.193.50.242:8030/uuid)
-- Приложение в окружении `Prod` - [API Server](http://130.193.50.242:8033/uuid)
+- Приложение в окружении `Stage` - ~~[API Server](http://130.193.50.242:8030/uuid)~~
+- Приложение в окружении `Prod` - ~~[API Server](http://130.193.50.242:8033/uuid)~~
+
+> После получения зачёта по дипломной работе, ресурсы были выключены
 
 ## Справочные материалы
 
@@ -2993,3 +2995,21 @@ openssl x509 -pubkey -in /etc/kubernetes/pki/ca.crt \
 ```
 
 </details>
+
+## Комментарии преподавателя
+
+### terraform
+- Как видите, вам пришлось описать три похожих ресурса при создании подсетей: [tf/network.tf](https://github.com/ArtemShtepa/diplom-devops16/blob/b15ba4f73ca0b89a74d656a405a10ead7a145c37/tf/network.tf#L27) . Можно было объявить переменную типа map или object, указать в качестве ключа, скажем, имя подсети, а в значении указать CIDR, зону и другие отличающиеся параметры. После этого можно создать похожие ресурсы в цикле, использовав [for_each](https://developer.hashicorp.com/terraform/language/meta-arguments/for_each) ,это позволит сократить код.
+- Здесь [tf/variables.tf](https://github.com/ArtemShtepa/diplom-devops16/blob/b15ba4f73ca0b89a74d656a405a10ead7a145c37/tf/variables.tf#L13) , пожалуй семантически не совсем верно называть массив zones - ведь в нём хранятся объекты подсетей, а не зоны.
+### ansible
+- Формирование inventory через вывод yc и переменные окружения - это вполне рабочее решение. Но можно было ещё сформировать inventory автоматически при помощи terraform и ресурса [local_file](https://docs.comcloud.xyz/providers/hashicorp/local/latest/docs/resources/file) и шаблонов. А поскольку все сервера находятся в облаке, можно было использовать и динамический inventory: [docs.ansible.com/...](https://docs.ansible.com/ansible/latest/inventory_guide/intro_dynamic_inventory.html) То, что вы генерируете в [ansible/playbook/dynamic_inv.yml](https://github.com/ArtemShtepa/diplom-devops16/blob/b15ba4f73ca0b89a74d656a405a10ead7a145c37/ansible/playbook/dynamic_inv.yml#L3) всё-таки не то, что называется динамическим inventory.
+- Многострочные файлы, наверное, всё-таки лучше помещать в files, а не размещать inline: [ansible/playbook/configure_yc+tf.yml](https://github.com/ArtemShtepa/diplom-devops16/blob/b15ba4f73ca0b89a74d656a405a10ead7a145c37/ansible/playbook/configure_yc%2Btf.yml#L12)
+- Таск ansible.builtin.package поддерживает массив пакетов в качестве значения для атрибута name. Использование цикла [ansible/playbook/configure_bastion.yml](https://github.com/ArtemShtepa/diplom-devops16/blob/b15ba4f73ca0b89a74d656a405a10ead7a145c37/ansible/playbook/configure_bastion.yml#L16) тоже вполне допустимо, но тратится лишнее время на инициализацию пакетного менеджера (загрузку списка пакетов, проверка целостности базы) на каждой итерации.
+### Dockerfile
+- В реальных проектах лучше использовать не latest образы [app_project/Dockerfile-full](https://github.com/ArtemShtepa/diplom-devops16/blob/b15ba4f73ca0b89a74d656a405a10ead7a145c37/app_project/Dockerfile-full#L6) , а конкретные теги. Ведь latest в стороннем репозитории может сдвинуться на другой образ, а ваше приложение или CI могут быть к этому не готовы.
+### CI/CD
+- Поскольку последовательность job уже задана через stages, то использовать needs не нужно: [app_project/.gitlab-ci.yml](https://github.com/ArtemShtepa/diplom-devops16/blob/b15ba4f73ca0b89a74d656a405a10ead7a145c37/app_project/.gitlab-ci.yml#L51) . На мой взгляд использование обоих механизмов только усложняет поддержку CI (нужно следить на соответствием обоих методов упорядочивания), но это исключительно моё видение.
+### kubernetes
+- Использование NodePort для “вывода” приложения в публичный доступ в реальных проектах используется довольно редко. Я понял, что вы “перед” этим сервисом используете HAProxy, но более “нативным” было бы, думаю, решение в виде Ingress на бызе Nginx или HAProxy с сетевым балансировщиком Яндекса или использование облачного ALB с соответствующим оператором. Ваше решение, впрочем, позволяет объединить в одной точке приложения в k8s и на отдельных виртуальных машинах.
+### Итоги
+Хотел бы сказать, что я был впечатлён вашей работой: полнотой и тщательностью выполнения требований, вниманием к деталям, оформлением (как в плане кода, так и документации). Заметки выше, разумеется, не являются требованиями по доработке. Разумеется, ставлю зачёт. Поздравляю вас с успешным окончанием курса!
